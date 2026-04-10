@@ -1,0 +1,4 @@
+record_id,title,source_type,route_lane,decision,downstream_queue,decision_reason
+link_platform_adoption,Digital platform adoption note,link,literature_ingest_lane,approved_for_analysis,analysis_ready,All demo validation checks passed.
+link_firm_dynamics,Firm dynamics working paper,link,literature_ingest_lane,needs_human_review,review_queue,citation_year_present
+pdf_policy_appendix,Policy appendix placeholder,pdf,pdf_ingest_lane,needs_human_review,review_queue,ocr_suspected_flag

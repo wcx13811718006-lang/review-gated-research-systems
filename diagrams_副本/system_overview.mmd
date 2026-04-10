@@ -1,0 +1,9 @@
+flowchart TD
+    A["Input Intake"] --> B["Ingestion"]
+    B --> C["Routing"]
+    C --> D["Validation Gate"]
+    D -->|approved| E["Analysis-Ready Export"]
+    D -->|review required| F["Review Packet Builder"]
+    F --> G["Human Review Queue"]
+    E --> H["Downstream Analysis Support"]
+

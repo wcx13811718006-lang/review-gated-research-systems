@@ -1,0 +1,4 @@
+record_id,title,url,year,abstract,project_tags,notes
+link_platform_adoption,Digital platform adoption note,https://example.org/platform-adoption-note,2024,"Structured overview of platform adoption, measurement choices, and productivity channels in a synthetic research setting.","literature;platforms;productivity","Metadata is complete enough for a first-pass intake."
+link_firm_dynamics,Firm dynamics working paper,https://example.org/firm-dynamics-working-paper,,"Working paper placeholder with incomplete citation details and a short abstract that should trigger review.","literature;labor;working-paper","Useful lead, but metadata is incomplete and should be reviewed before downstream use."
+

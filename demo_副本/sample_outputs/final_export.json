@@ -1,0 +1,87 @@
+{
+  "project": {
+    "project_id": "demo_digital_economy_review_gate",
+    "project_name": "Digital Economy Literature Intake Demo",
+    "research_question": "How can a review-gated research system support structured intake before downstream analysis?",
+    "design_priorities": [
+      "review-gated decisions",
+      "human oversight",
+      "structured outputs",
+      "downstream analysis support"
+    ]
+  },
+  "analysis_ready_records": [
+    {
+      "record": {
+        "record_id": "link_platform_adoption",
+        "source_type": "link",
+        "title": "Digital platform adoption note",
+        "locator": "https://example.org/platform-adoption-note",
+        "abstract": "Structured overview of platform adoption, measurement choices, and productivity channels in a synthetic research setting.",
+        "project_tags": [
+          "literature",
+          "platforms",
+          "productivity"
+        ],
+        "notes": "Metadata is complete enough for a first-pass intake.",
+        "metadata": {
+          "year": "2024"
+        },
+        "synthetic_text": ""
+      },
+      "decision": "approved_for_analysis",
+      "route_lane": "literature_ingest_lane"
+    }
+  ],
+  "review_queue_records": [
+    {
+      "record": {
+        "record_id": "link_firm_dynamics",
+        "source_type": "link",
+        "title": "Firm dynamics working paper",
+        "locator": "https://example.org/firm-dynamics-working-paper",
+        "abstract": "Working paper placeholder with incomplete citation details and a short abstract that should trigger review.",
+        "project_tags": [
+          "literature",
+          "labor",
+          "working-paper"
+        ],
+        "notes": "Useful lead, but metadata is incomplete and should be reviewed before downstream use.",
+        "metadata": {
+          "year": ""
+        },
+        "synthetic_text": ""
+      },
+      "decision": "needs_human_review",
+      "route_lane": "literature_ingest_lane",
+      "decision_reason": "citation_year_present"
+    },
+    {
+      "record": {
+        "record_id": "pdf_policy_appendix",
+        "source_type": "pdf",
+        "title": "Policy appendix placeholder",
+        "locator": "demo/sample_inputs/sample_pdf_placeholder.txt",
+        "abstract": "Synthetic placeholder for a non-distributed document artifact.",
+        "project_tags": [
+          "policy",
+          "pdf",
+          "validation"
+        ],
+        "notes": "Placeholder artifact used to demonstrate degraded extraction and review routing.",
+        "metadata": {
+          "ocr_suspected": true,
+          "distribution_status": "placeholder_only"
+        },
+        "synthetic_text": "This file stands in for a document artifact that is not distributed publicly.\n\nThe text is intentionally short and incomplete so the demo validation layer routes it\nto human review instead of treating it as analysis-ready evidence.\n\n"
+      },
+      "decision": "needs_human_review",
+      "route_lane": "pdf_ingest_lane",
+      "decision_reason": "ocr_suspected_flag"
+    }
+  ],
+  "next_actions": [
+    "repair or enrich records that failed readiness checks",
+    "submit approved records to downstream analysis tasks"
+  ]
+}

@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+title: "review-gated-research-systems"
+message: "If you reference this repository, please cite the repository record or link directly to the GitHub project."
+type: software
+authors:
+  - family-names: "Wu"
+    given-names: "Chenxuan"
+keywords:
+  - "research systems"
+  - "human-in-the-loop"
+  - "validation"
+  - "research automation"
+  - "literature ingestion"
+abstract: "Sanitized public showcase of a review-gated, human-in-the-loop research system for literature, link, and document intake, with validation, structured review packets, and downstream analysis support."
+license: "MIT"
+version: "0.1.0"
+date-released: "2026-04-10"

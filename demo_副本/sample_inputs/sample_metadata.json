@@ -1,0 +1,33 @@
+{
+  "project": {
+    "project_id": "demo_digital_economy_review_gate",
+    "project_name": "Digital Economy Literature Intake Demo",
+    "research_question": "How can a review-gated research system support structured intake before downstream analysis?",
+    "design_priorities": [
+      "review-gated decisions",
+      "human oversight",
+      "structured outputs",
+      "downstream analysis support"
+    ]
+  },
+  "validation": {
+    "minimum_link_abstract_words": 14,
+    "minimum_pdf_text_characters": 160
+  },
+  "pdf_record": {
+    "record_id": "pdf_policy_appendix",
+    "title": "Policy appendix placeholder",
+    "source_type": "pdf",
+    "locator": "demo/sample_inputs/sample_pdf_placeholder.txt",
+    "project_tags": [
+      "policy",
+      "pdf",
+      "validation"
+    ],
+    "notes": "Placeholder artifact used to demonstrate degraded extraction and review routing.",
+    "metadata": {
+      "ocr_suspected": true,
+      "distribution_status": "placeholder_only"
+    }
+  }
+}

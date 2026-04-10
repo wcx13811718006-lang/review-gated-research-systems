@@ -1,0 +1,12 @@
+flowchart LR
+    A["ingest"] --> B["routing"]
+    B --> C["validation"]
+    C --> D["review"]
+    C --> E["export"]
+    D --> E
+    F["utils"] --> A
+    F --> B
+    F --> C
+    F --> D
+    F --> E
+

@@ -1,0 +1,5 @@
+This file stands in for a document artifact that is not distributed publicly.
+
+The text is intentionally short and incomplete so the demo validation layer routes it
+to human review instead of treating it as analysis-ready evidence.
+

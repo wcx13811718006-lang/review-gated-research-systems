@@ -1,0 +1,14 @@
+{
+  "project_name": "Digital Economy Literature Intake Demo",
+  "records_processed": 3,
+  "approved_for_analysis": 1,
+  "needs_human_review": 2,
+  "artifact_manifest": {
+    "routing_decisions": "demo/sample_outputs/routing_decisions.json",
+    "review_packet_json": "demo/sample_outputs/review_packet.json",
+    "review_packet_markdown": "demo/sample_outputs/review_packet.md",
+    "final_export": "demo/sample_outputs/final_export.json",
+    "system_status": "demo/sample_outputs/system_status.csv",
+    "analysis_brief": "demo/sample_outputs/analysis_brief.md"
+  }
+}

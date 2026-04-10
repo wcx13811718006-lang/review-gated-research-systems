@@ -1,0 +1,124 @@
+{
+  "packet_id": "demo_review_packet",
+  "project": {
+    "project_id": "demo_digital_economy_review_gate",
+    "project_name": "Digital Economy Literature Intake Demo",
+    "research_question": "How can a review-gated research system support structured intake before downstream analysis?",
+    "design_priorities": [
+      "review-gated decisions",
+      "human oversight",
+      "structured outputs",
+      "downstream analysis support"
+    ]
+  },
+  "approved_records": [
+    {
+      "record_id": "link_platform_adoption",
+      "title": "Digital platform adoption note",
+      "source_type": "link",
+      "route_lane": "literature_ingest_lane",
+      "decision": "approved_for_analysis",
+      "decision_reason": "All demo validation checks passed.",
+      "project_tags": [
+        "literature",
+        "platforms",
+        "productivity"
+      ],
+      "notes": "Metadata is complete enough for a first-pass intake.",
+      "checks": [
+        {
+          "name": "required_fields_present",
+          "passed": true,
+          "detail": "Record has the minimum required fields for intake."
+        },
+        {
+          "name": "citation_year_present",
+          "passed": true,
+          "detail": "Link-like sources should include a year for downstream citation hygiene."
+        },
+        {
+          "name": "abstract_length_threshold",
+          "passed": true,
+          "detail": "Abstract word count: 15."
+        }
+      ]
+    }
+  ],
+  "review_queue_records": [
+    {
+      "record_id": "link_firm_dynamics",
+      "title": "Firm dynamics working paper",
+      "source_type": "link",
+      "route_lane": "literature_ingest_lane",
+      "decision": "needs_human_review",
+      "decision_reason": "citation_year_present",
+      "project_tags": [
+        "literature",
+        "labor",
+        "working-paper"
+      ],
+      "notes": "Useful lead, but metadata is incomplete and should be reviewed before downstream use.",
+      "checks": [
+        {
+          "name": "required_fields_present",
+          "passed": true,
+          "detail": "Record has the minimum required fields for intake."
+        },
+        {
+          "name": "citation_year_present",
+          "passed": false,
+          "detail": "Link-like sources should include a year for downstream citation hygiene."
+        },
+        {
+          "name": "abstract_length_threshold",
+          "passed": true,
+          "detail": "Abstract word count: 15."
+        }
+      ],
+      "review_questions": [
+        "Is the source description complete enough for downstream use?",
+        "Should the record be revised, enriched, or held out of the analysis set?"
+      ]
+    },
+    {
+      "record_id": "pdf_policy_appendix",
+      "title": "Policy appendix placeholder",
+      "source_type": "pdf",
+      "route_lane": "pdf_ingest_lane",
+      "decision": "needs_human_review",
+      "decision_reason": "ocr_suspected_flag",
+      "project_tags": [
+        "policy",
+        "pdf",
+        "validation"
+      ],
+      "notes": "Placeholder artifact used to demonstrate degraded extraction and review routing.",
+      "checks": [
+        {
+          "name": "required_fields_present",
+          "passed": true,
+          "detail": "Record has the minimum required fields for intake."
+        },
+        {
+          "name": "document_text_threshold",
+          "passed": true,
+          "detail": "Extracted placeholder text length: 231."
+        },
+        {
+          "name": "ocr_suspected_flag",
+          "passed": false,
+          "detail": "OCR suspicion keeps the record review-gated in this public demo."
+        }
+      ],
+      "review_questions": [
+        "Is the source description complete enough for downstream use?",
+        "Should the record be revised, enriched, or held out of the analysis set?"
+      ]
+    }
+  ],
+  "human_action_checklist": [
+    "Confirm whether incomplete metadata can be repaired.",
+    "Confirm whether degraded document text should trigger a richer extraction step.",
+    "Approve only the records that meet downstream readiness standards."
+  ]
+}

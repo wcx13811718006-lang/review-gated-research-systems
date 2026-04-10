@@ -1,0 +1,86 @@
+{
+  "project_id": "demo_digital_economy_review_gate",
+  "decisions": [
+    {
+      "record_id": "link_platform_adoption",
+      "title": "Digital platform adoption note",
+      "source_type": "link",
+      "route_lane": "literature_ingest_lane",
+      "decision": "approved_for_analysis",
+      "decision_reason": "All demo validation checks passed.",
+      "review_required": false,
+      "checks": [
+        {
+          "name": "required_fields_present",
+          "passed": true,
+          "detail": "Record has the minimum required fields for intake."
+        },
+        {
+          "name": "citation_year_present",
+          "passed": true,
+          "detail": "Link-like sources should include a year for downstream citation hygiene."
+        },
+        {
+          "name": "abstract_length_threshold",
+          "passed": true,
+          "detail": "Abstract word count: 15."
+        }
+      ],
+      "downstream_queue": "analysis_ready"
+    },
+    {
+      "record_id": "link_firm_dynamics",
+      "title": "Firm dynamics working paper",
+      "source_type": "link",
+      "route_lane": "literature_ingest_lane",
+      "decision": "needs_human_review",
+      "decision_reason": "citation_year_present",
+      "review_required": true,
+      "checks": [
+        {
+          "name": "required_fields_present",
+          "passed": true,
+          "detail": "Record has the minimum required fields for intake."
+        },
+        {
+          "name": "citation_year_present",
+          "passed": false,
+          "detail": "Link-like sources should include a year for downstream citation hygiene."
+        },
+        {
+          "name": "abstract_length_threshold",
+          "passed": true,
+          "detail": "Abstract word count: 15."
+        }
+      ],
+      "downstream_queue": "review_queue"
+    },
+    {
+      "record_id": "pdf_policy_appendix",
+      "title": "Policy appendix placeholder",
+      "source_type": "pdf",
+      "route_lane": "pdf_ingest_lane",
+      "decision": "needs_human_review",
+      "decision_reason": "ocr_suspected_flag",
+      "review_required": true,
+      "checks": [
+        {
+          "name": "required_fields_present",
+          "passed": true,
+          "detail": "Record has the minimum required fields for intake."
+        },
+        {
+          "name": "document_text_threshold",
+          "passed": true,
+          "detail": "Extracted placeholder text length: 231."
+        },
+        {
+          "name": "ocr_suspected_flag",
+          "passed": false,
+          "detail": "OCR suspicion keeps the record review-gated in this public demo."
+        }
+      ],
+      "downstream_queue": "review_queue"
+    }
+  ]
+}

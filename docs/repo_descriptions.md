@@ -1,12 +1,16 @@
 # Reusable Repo Descriptions
 
+## GitHub About
+
+Sanitized public showcase of review-gated research systems for validation-aware, human-in-the-loop workflow design.
+
 ## CV Version: AI / Digital Economy
 
-Built a review-gated research systems prototype for literature, link, and document intake using modular routing, validation checks, structured review packets, and human-in-the-loop escalation. The system is designed to improve workflow visibility, reduce downstream verification debt, and support reproducible research operations.
+Built a review-gated research systems prototype for literature, link, and document intake using modular routing, validation checks, structured review packets, and human-in-the-loop escalation. The system is designed to improve process visibility, reduce downstream verification debt, and support reproducible research operations.
 
 ## CV Version: Business Economics / Applied Micro
 
-Developed a modular research support system for structured source intake, validation, review routing, and downstream analysis preparation. The system emphasizes human oversight, explicit quality gates, and reproducible workflow design rather than fully automated research claims.
+Developed a modular research support system for structured source intake, validation, review routing, and downstream analysis preparation. The system emphasizes human oversight, explicit quality gates, and reproducible research system design rather than fully automated research claims.
 
 ## Outreach Version (80-120 words)
 

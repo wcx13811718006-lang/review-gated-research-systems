@@ -2,7 +2,7 @@
 
 This public showcase demonstrates a compact version of a review-gated research system. The design favors inspectable stages over hidden automation and keeps uncertainty visible throughout the pipeline.
 
-## Workflow Overview
+## System Overview
 
 ```mermaid
 flowchart TD

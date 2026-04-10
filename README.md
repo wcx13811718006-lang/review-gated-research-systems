@@ -1,12 +1,12 @@
-# review-gated-research-systems
+# Review-Gated Research Systems
 
-`review-gated-research-systems` is a sanitized public showcase of a broader non-public research automation environment. It demonstrates how review gates, human oversight, routing, and validation can be built into research-support systems so that source materials are checked before they move into downstream analysis. It does not claim autonomous end-to-end research. It demonstrates a conservative, modular approach to safer and more reproducible research operations.
+Review-Gated Research Systems is a sanitized public showcase of a broader non-public research automation environment. It demonstrates validation-aware, human-in-the-loop system design for literature, link, and document intake, with review gates that prevent uncertain records from moving directly into downstream research use. The emphasis is conservative routing, provenance visibility, and downstream-safe outputs rather than autonomous research claims.
 
 ## What This Repository Is
 
 - a compact public portfolio repository
 - a runnable demo built on toy inputs and inspectable outputs
-- an architecture-first example of review-gated research support
+- an architecture-first public example of review-gated research systems
 
 ## What It Demonstrates
 
@@ -61,11 +61,13 @@ flowchart LR
 
 ```text
 repo_root/
+├── .gitignore
 ├── README.md
 ├── LICENSE
 ├── CITATION.cff
 ├── CONTRIBUTING.md
-├── CHANGELOG.md
+├── pyproject.toml
+├── requirements.txt
 ├── docs/
 ├── diagrams/
 ├── demo/

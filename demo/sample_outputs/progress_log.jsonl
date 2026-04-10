@@ -1,0 +1,5 @@
+{"timestamp_utc": "2026-04-10T22:06:55.446456+00:00", "stage": "ingest", "detail": "Loaded demo inputs.", "count": 3}
+{"timestamp_utc": "2026-04-10T22:06:55.446637+00:00", "stage": "route", "detail": "Assigned records to workflow lanes.", "count": 3}
+{"timestamp_utc": "2026-04-10T22:06:55.446685+00:00", "stage": "validate", "detail": "Applied review-gate checks.", "count": 3}
+{"timestamp_utc": "2026-04-10T22:06:55.446733+00:00", "stage": "review_packet", "detail": "Prepared structured review packet.", "count": 2}
+{"timestamp_utc": "2026-04-10T22:06:55.447654+00:00", "stage": "export", "detail": "Wrote public demo artifacts."}

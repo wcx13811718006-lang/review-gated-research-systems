@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: "review-gated-research-systems"
+title: "Review-Gated Research Systems"
 message: "If you reference this repository, please cite the repository record or link directly to the GitHub project."
 type: software
 authors:
@@ -11,7 +11,7 @@ keywords:
   - "validation"
   - "research automation"
   - "literature ingestion"
-abstract: "Sanitized public showcase of a review-gated, human-in-the-loop research system for literature, link, and document intake, with validation, structured review packets, and downstream analysis support."
+abstract: "Sanitized public showcase of review-gated research systems for validation-aware, human-in-the-loop research support, including structured intake, review gates, and downstream-safe outputs."
 license: "MIT"
 version: "0.1.0"
 date-released: "2026-04-10"

@@ -1,48 +1,42 @@
 # Case Study
 
-This note gives a sanitized example of how a review-gated research system handles records with different evidence quality profiles. The goal is not to maximize automation. The goal is to separate records that are ready for downstream use from records that require review or should be held back.
+This note gives a sanitized example of how a review-gated research system handles records with different evidence-quality profiles. The contribution is not that AI replaces researchers. The contribution is that AI can help organize intake, structure uncertainty, and produce better handoff artifacts before downstream use.
 
-## Scenario
+## Three Public Demo Cases
 
-Assume a small intake batch for a literature-support task contains three records:
+The public demo centers on three simple cases:
 
-1. a well-formed research note with complete citation metadata
-2. a document-like artifact with incomplete or degraded extraction
-3. a source with missing provenance and weak evidentiary value
+1. a valid case that can move forward safely
+2. an ambiguous case that should pause for review
+3. a degraded case that should remain visible but should not move downstream
 
 ## Example Handling
 
-| Input type | Initial condition | Routing outcome | Gate decision | Human role | Downstream result |
+| Case | Initial condition | Routing outcome | Gate decision | Human role | Downstream result |
 | --- | --- | --- | --- | --- | --- |
-| Valid input | metadata is complete, extraction is readable, source context is clear | routed to the standard literature lane | pass | optional spot check | analysis-ready export |
-| Ambiguous input | source may be relevant, but metadata is incomplete or extraction quality is uncertain | routed to a review lane | review | inspect the record, repair metadata, or request a better source copy | structured review packet; no downstream use until cleared |
-| Invalid input | provenance is weak, text is unusable, or the source does not meet minimum intake requirements | routed away from analysis | hold | decide whether to replace, exclude, or archive the record | held out of downstream use |
+| Valid case | metadata is complete and the source is readable enough for first-pass use | routed to the standard lane | pass | optional spot check | analysis-ready export |
+| Ambiguous case | source may be useful, but metadata is incomplete or context is weak | routed to review | review | inspect, enrich, revise, or hold | structured review packet; no downstream use until cleared |
+| Degraded case | extraction quality is weak, provenance is incomplete, or the artifact is not fit for confident reuse | routed away from automatic pass-through | hold or review | decide whether to repair, replace, or exclude | preserved as an inspectable failure or review artifact |
 
-## What Changes Across The Three Cases
+## Why The Distinction Matters
 
-### 1. Valid input
-
-A valid record is not merely one that can be parsed. It is one that has enough provenance and readable content to support later research work. In the public demo, this means the record can be exported as analysis-ready without bypassing the validation layer.
-
-### 2. Ambiguous input
-
-An ambiguous record may still be useful, but it is not yet safe for downstream use. A review-gated system treats this as a normal state. The record receives a structured review packet so a human can inspect what is known, what is missing, and what should happen next.
-
-### 3. Invalid input
-
-An invalid record should not be allowed to create false confidence downstream. If provenance is too weak, extraction fails badly, or the source is not fit for the task, the appropriate outcome is to hold or exclude it rather than force it through the system.
-
-## Why This Matters
-
-The distinction between pass, review, and hold is especially important in research settings. A weak source that quietly enters later analysis can create avoidable verification debt. A review-gated design makes those boundaries visible and supports more careful reuse of machine-assisted outputs.
+In research settings, the difference between “usable,” “ambiguous,” and “degraded” should be explicit. A system that silently passes along uncertain records creates verification debt later. A review-gated design reduces that risk by separating what is ready for downstream use from what still needs judgment.
 
 ## Public Demo Alignment
 
-The public demo in this repository illustrates these patterns in simplified form:
+The public demo illustrates these cases in compact form:
 
-- one record is cleared for downstream use
-- one record is sent to review because metadata is incomplete
-- one record is sent to review because document quality is uncertain
+- a link-like record with sufficient metadata is exported as analysis-ready
+- a link-like record with missing citation detail is routed into review
+- a document placeholder with degraded text quality is routed into review rather than treated as analysis-ready evidence
 
-The examples are intentionally small and sanitized, but the logic reflects a broader research-systems concern: downstream work should begin only after evidence quality has been checked.
+## What The Reader Should Notice
 
+- the system preserves the ambiguous and degraded cases rather than hiding them
+- the review artifact explains why the record was paused
+- the export contains only the record that clears the gate
+- the architecture rewards caution over apparent throughput
+
+## What This Case Study Does Not Claim
+
+This case study does not claim comprehensive document handling, autonomous literature review, or full substitution for human research judgment. It demonstrates a design pattern for responsible AI-assisted research operations.

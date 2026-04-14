@@ -1,85 +1,68 @@
 # Evaluation
 
-This repository does not frame evaluation around automation rate. A more relevant question for research-support systems is whether the system separates records appropriately into pass, review, and hold states before downstream use.
+This repository does not frame evaluation around automation rate. For research-support systems, the more relevant question is whether the workflow separates records appropriately into pass, review, and hold states before downstream use.
 
-## Evaluation Focus
+## Core Evaluation Question
 
-The central evaluation question is:
+How well does the system preserve downstream safety and human judgment while still making intake, routing, and review more structured and inspectable?
 
-How well does the system support downstream safety by distinguishing records that are ready for use from records that still require human judgment?
+## Evaluation Dimensions
 
-## What Matters Most
+### 1. Routing clarity
 
-### Decision quality
+Can a reader tell why a record was routed into a given lane?
 
-The system should avoid treating any generated or extracted output as trustworthy merely because it exists. A stronger result is one in which:
+### 2. Review-gate preservation
 
-- clearly usable records move forward
-- uncertain records pause for review
-- unsuitable records are held back
+Does the system keep uncertain or degraded records out of downstream-safe export?
 
-### Downstream safety
+### 3. Downstream safety
 
-Evaluation should consider whether later research work begins from evidence that has passed appropriate checks. In practice, this means the system should reduce silent propagation of weak metadata, degraded document extraction, or unsupported summaries.
+Are approved outputs clearly separated from unresolved records so that later analysis starts from better evidence?
 
-### Review usefulness
+### 4. Inspectability
 
-When a record is routed to review, the resulting packet should help a human reviewer understand why the record was paused and what action is needed next.
+Can a faculty member, research assistant, or collaborator inspect the decision trail quickly without reverse-engineering the entire codebase?
 
+### 5. Traceability
 
-## Current Evaluation Gaps
+Does each record leave visible artifacts such as routing decisions, review packets, status logs, or final exports?
 
-The current public evaluation framing is directionally strong, but several gaps still make it hard to judge quality rigorously:
+### 6. Ambiguity handling
 
-1. **No explicit scorecard or thresholds**
-   The document describes what matters but does not define measurable targets (for example, acceptable false-pass rate or maximum unresolved-review backlog).
+Does the workflow treat ambiguity as a visible state rather than forcing premature pass-through?
 
-2. **No error taxonomy**
-   Failure modes (metadata gaps, extraction degradation, citation issues) are mentioned, but they are not grouped into a formal taxonomy that supports consistent analysis over time.
+### 7. Human-review visibility
 
-3. **No baseline comparison**
-   There is no side-by-side comparison against an ungated workflow or alternate routing strategy, so it is hard to quantify the value added by review gating.
+When a record is paused, is the reason legible, and does the review packet support a meaningful human decision?
 
-4. **No reviewer agreement signal**
-   The framework does not yet include inter-reviewer consistency checks, which are important when human judgment is a core safety mechanism.
+### 8. Export discipline
 
-5. **No longitudinal drift checks**
-   The evaluation view is static and does not define how to monitor quality drift across batches, source domains, or extraction-tool changes.
+Does the repository make it clear which outputs are safe for downstream use and which are not?
 
-6. **No queue-health and latency metrics**
-   Review usefulness is discussed, but practical operations metrics (time-to-review, stale packet rate, rework frequency) are missing.
+### 9. Transparency of failure cases
 
-7. **No calibration loop back into rules**
-   The document does not specify how reviewer outcomes should feed back into threshold tuning, rule updates, and release gating.
+Are degraded or invalid cases preserved as inspectable examples, or do they disappear into the system?
 
-## Suggested Next-Step Metrics
+## How A Non-Engineering Reader Can Evaluate The Demo
 
-A lightweight public-safe scorecard could include:
+An outsider can inspect the public demo in five steps:
 
-- **Safety metrics:** false-pass rate, hold precision, critical-miss count
-- **Workflow metrics:** review queue size, median review latency, reopen rate
-- **Quality metrics:** citation completeness, extraction integrity score, packet actionability rating
-- **Stability metrics:** metric drift by source type and by run date
+1. open the sample inputs
+2. inspect the routing decision file
+3. inspect the review packet
+4. inspect the analysis-ready export
+5. compare the export against the status surface
 
-These additions would keep the conservative philosophy intact while making evaluation more auditable and reproducible.
+If those artifacts make the system legible, the public showcase is doing its job.
 
 ## What This Repository Does Not Claim
 
-- it does not claim benchmark leadership
-- it does not claim comprehensive coverage of all document or source types
-- it does not claim that automated pass-through is the primary success metric
-- it does not claim to replace human research judgment
-
-## Reasonable Public Demonstration Criteria
-
-For a public showcase like this one, a sensible standard is whether the demo makes the following visible:
-
-- the difference between accepted, review-gated, and held records
-- the reason each decision was made
-- the outputs that are safe to pass downstream
-- the points where human oversight remains necessary
+- benchmark leadership
+- comprehensive coverage across source types
+- that automated pass-through is the primary success metric
+- replacement of human research judgment
 
 ## Research-Oriented Interpretation
 
-In academic settings, a conservative system may be preferable to an aggressive one. A higher review rate is not automatically a weakness if it prevents questionable material from entering later analysis without scrutiny. For that reason, this repository emphasizes decision quality, review routing, and downstream-safe outputs rather than raw automation volume.
-
+In academic settings, a conservative workflow can be preferable to an aggressive one. A higher review rate is not automatically a weakness if it keeps questionable material from entering later analysis without scrutiny. For that reason, this repository emphasizes routing quality, review visibility, and downstream-safe export rather than raw automation volume.

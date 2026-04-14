@@ -5,16 +5,19 @@ This public showcase demonstrates a compact version of a review-gated research s
 ## System Overview
 
 ```mermaid
-flowchart TD
-    A["Input Intake<br/>links, metadata, document placeholder"] --> B["Ingestion"]
+flowchart LR
+    A["Public-safe inputs"] --> B["Ingestion"]
     B --> C["Routing"]
-    C --> D["Validation Gate"]
-    D -->|approved| E["Analysis-Ready Export"]
-    D -->|review required| F["Structured Review Packet"]
-    F --> G["Human Review Queue"]
-    G --> H["Decision Re-entry<br/>future extension"]
-    E --> I["Downstream Analysis Support"]
+    C --> D["Validation gate"]
+    D -->|approved| E["Analysis-ready export"]
+    D -->|review required| F["Structured review packet"]
+    D -->|not suitable| G["Hold / exclude"]
+    F --> H["Human review"]
+    H -->|approve or revise| E
+    H -->|decline or defer| G
 ```
+
+If Mermaid rendering is weak in your viewer, the fallback reading is: ingest first, route second, validate third, and only export after the record clears the gate. Review and hold states are explicit outcomes, not hidden exceptions.
 
 ## Module Boundaries
 
@@ -65,3 +68,5 @@ flowchart LR
 - Review packets are written for humans, with enough context to understand why an item was paused.
 - Exports separate analysis-ready records from records still waiting for review.
 - A downstream analysis brief is generated so approved records are immediately usable in later research-support tasks.
+
+For quicker visual skimming, see [`../diagrams/README.md`](../diagrams/README.md).

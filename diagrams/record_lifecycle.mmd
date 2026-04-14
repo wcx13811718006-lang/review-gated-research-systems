@@ -1,0 +1,9 @@
+flowchart LR
+    A["Intake"] --> B["Routed"]
+    B --> C["Validated"]
+    C -->|clear| D["Analysis-ready"]
+    C -->|uncertain| E["Review-gated"]
+    C -->|not fit| F["Held"]
+    E --> G["Reviewed"]
+    G -->|approved| D
+    G -->|not approved| F

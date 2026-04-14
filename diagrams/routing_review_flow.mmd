@@ -1,0 +1,9 @@
+flowchart TD
+    A["New record"] --> B["Assign source lane"]
+    B --> C["Run validation checks"]
+    C -->|checks pass| D["Approved for analysis"]
+    C -->|metadata weak or extraction degraded| E["Create review packet"]
+    E --> F["Human review"]
+    F -->|approve| D
+    F -->|revise and resubmit| C
+    F -->|exclude or defer| G["Hold"]

@@ -30,6 +30,7 @@ classifiers = [
 
 [project.scripts]
 research-ai-local = "research_systems_showcase.local_ai.cli:main"
+research-ai-replay = "research_systems_showcase.local_ai.replay:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

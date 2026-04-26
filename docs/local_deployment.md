@@ -27,6 +27,7 @@ The example config assumes:
 - model `qwen2.5:7b`
 - LM Studio at `http://127.0.0.1:1234`, optional for now
 - source context is capped at 4,000 characters per file by default for local-model stability
+- PDF extraction is optional and local-first. If `pdfplumber` or `pypdf` is installed, the local layer will try them; extraction failures are recorded in `request.json`.
 
 ## Check Local Backends
 
@@ -66,6 +67,7 @@ If `status` says a backend is reachable but `ask` still fails, inspect the gener
 Observed local failure patterns:
 
 - `llama runner process has terminated`: Ollama accepted the request but the model runner crashed. Check `ollama run <model>` directly, restart Ollama, or switch to a smaller / more stable local model.
+- `pdf_extraction_failed`: the source was a PDF, but local PDF extraction did not produce usable text. Install or repair `pdfplumber` / `pypdf`, try a repaired PDF, or route the file to a stronger extraction pipeline.
 - LM Studio returns `reasoning_content` but no final `content`: the model is exposing thinking output without a usable final answer. The local layer marks this as `final_answer_present=false` and keeps the result review-gated.
 
 For stable research use, prefer a model that returns a clear final answer through the normal `content` field.

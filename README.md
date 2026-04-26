@@ -104,7 +104,13 @@ research-ai-local --config local_ai.config.json status
 research-ai-local --config local_ai.config.json ask "Summarize this repository for a research collaborator." --source README.md
 ```
 
-See [`docs/local_deployment.md`](./docs/local_deployment.md) and [`docs/quality_guardrails.md`](./docs/quality_guardrails.md).
+Historical replay comparisons can be run locally against private benchmark CSVs:
+
+```bash
+research-ai-replay --csv "/path/to/private/benchmark.csv" --output /tmp/replay_report.json
+```
+
+See [`docs/local_deployment.md`](./docs/local_deployment.md), [`docs/quality_guardrails.md`](./docs/quality_guardrails.md), [`docs/local_validation_protocol.md`](./docs/local_validation_protocol.md), and [`docs/external_agent_patterns.md`](./docs/external_agent_patterns.md).
 
 ## Demo Path
 
@@ -187,6 +193,8 @@ It does not claim to replace faculty judgment, archival verification, domain exp
 - [`docs/case_study.md`](./docs/case_study.md)
 - [`docs/local_deployment.md`](./docs/local_deployment.md)
 - [`docs/quality_guardrails.md`](./docs/quality_guardrails.md)
+- [`docs/local_validation_protocol.md`](./docs/local_validation_protocol.md)
+- [`docs/external_agent_patterns.md`](./docs/external_agent_patterns.md)
 - [`diagrams/README.md`](./diagrams/README.md)
 
 ## License And Citation

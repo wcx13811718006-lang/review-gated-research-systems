@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import contextlib
 from datetime import datetime, timezone
+import importlib
+import importlib.util
+import io
 from pathlib import Path
 from typing import Any
+from xml.etree import ElementTree
+from zipfile import BadZipFile, ZipFile
 
 from ..utils.io import ensure_directory, write_json, write_text
 from .backends import (
@@ -19,6 +25,90 @@ def _utc_stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
+def _read_docx_text(path: Path) -> str:
+    with ZipFile(path) as archive:
+        document_xml = archive.read("word/document.xml")
+    root = ElementTree.fromstring(document_xml)
+    namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    paragraphs: list[str] = []
+    for paragraph in root.findall(".//w:p", namespace):
+        parts = [
+            node.text or ""
+            for node in paragraph.findall(".//w:t", namespace)
+            if node.text
+        ]
+        if parts:
+            paragraphs.append("".join(parts))
+    return "\n".join(paragraphs)
+
+
+def _read_pdf_text(path: Path) -> tuple[str, str]:
+    errors: list[str] = []
+
+    pdfplumber_spec = importlib.util.find_spec("pdfplumber")
+    if pdfplumber_spec is not None:
+        try:
+            pdfplumber = importlib.import_module("pdfplumber")
+            with contextlib.redirect_stderr(io.StringIO()):
+                with pdfplumber.open(path) as pdf:
+                    text = "\n".join((page.extract_text() or "") for page in pdf.pages)
+            if text.strip():
+                return text, ""
+            errors.append("pdfplumber_empty")
+        except Exception as exc:
+            errors.append(f"pdfplumber_failed:{type(exc).__name__}:{exc}")
+    else:
+        errors.append("pdfplumber_not_installed")
+
+    pypdf_spec = importlib.util.find_spec("pypdf")
+    if pypdf_spec is not None:
+        try:
+            pypdf = importlib.import_module("pypdf")
+            with contextlib.redirect_stderr(io.StringIO()):
+                reader = pypdf.PdfReader(str(path))
+                text = "\n".join((page.extract_text() or "") for page in reader.pages)
+            if text.strip():
+                return text, ""
+            errors.append("pypdf_empty")
+        except Exception as exc:
+            errors.append(f"pypdf_failed:{type(exc).__name__}:{exc}")
+    else:
+        errors.append("pypdf_not_installed")
+
+    return "", "pdf_extraction_failed: " + "; ".join(errors)
+
+
+def _looks_binary(raw: bytes) -> bool:
+    if b"\x00" in raw:
+        return True
+    if not raw:
+        return False
+    control_bytes = sum(1 for byte in raw if byte < 9 or 14 <= byte < 32)
+    return control_bytes / len(raw) > 0.08
+
+
+def _read_source_text(path: Path) -> tuple[str, str]:
+    suffix = path.suffix.lower()
+    if suffix == ".pdf":
+        return _read_pdf_text(path)
+    if suffix in {".xlsx", ".xlsm", ".xls"}:
+        return "", "spreadsheet_extraction_not_available_in_public_local_layer"
+    if suffix == ".docx":
+        try:
+            text = _read_docx_text(path)
+        except (BadZipFile, KeyError, ElementTree.ParseError, OSError) as exc:
+            return "", f"docx_read_failed: {type(exc).__name__}: {exc}"
+        return text, "" if text.strip() else "docx_empty"
+
+    try:
+        raw = path.read_bytes()
+    except OSError as exc:
+        return "", f"{type(exc).__name__}: {exc}"
+    if _looks_binary(raw[:4096]):
+        return "", "binary_file_not_included"
+    return raw.decode("utf-8", errors="replace"), ""
+
+
 def _read_source_context(paths: list[Path], max_chars_per_file: int) -> tuple[str, list[dict[str, Any]]]:
     chunks: list[str] = []
     manifest: list[dict[str, Any]] = []
@@ -32,10 +122,9 @@ def _read_source_context(paths: list[Path], max_chars_per_file: int) -> tuple[st
             record["reason"] = "not_a_file"
             manifest.append(record)
             continue
-        try:
-            text = path.read_text(encoding="utf-8", errors="replace")
-        except OSError as exc:
-            record["reason"] = f"{type(exc).__name__}: {exc}"
+        text, reason = _read_source_text(path)
+        if reason:
+            record["reason"] = reason
             manifest.append(record)
             continue
         snippet = text[:max_chars_per_file]
@@ -105,6 +194,7 @@ def run_local_research_prompt(
         source_paths or [],
         int(config.get("max_source_characters_per_file", 4000)),
     )
+    preview_limit = int(config.get("source_context_preview_characters", 1000))
     prompt = _build_prompt(user_prompt, source_context)
     backend_name, backend_status = _select_backend(config)
 
@@ -171,6 +261,8 @@ def run_local_research_prompt(
             "generation_attempts": generation_attempts,
             "backend_status": backend_status,
             "source_manifest": source_manifest,
+            "source_context_characters": len(source_context),
+            "source_context_preview": source_context[:preview_limit],
         },
     )
     write_text(run_dir / "draft_response.md", model_answer + "\n")

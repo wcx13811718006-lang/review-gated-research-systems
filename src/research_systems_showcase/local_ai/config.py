@@ -12,6 +12,7 @@ DEFAULT_LOCAL_AI_CONFIG: dict[str, Any] = {
     "fallback_to_review_backend": True,
     "outputs_dir": "outputs/local_ai_runs",
     "max_source_characters_per_file": 4000,
+    "source_context_preview_characters": 1000,
     "ollama": {
         "base_url": "http://127.0.0.1:11434",
         "model": "qwen2.5:7b",

@@ -13,7 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.research_systems_showcase.local_ai.assistant import run_local_research_prompt
 from src.research_systems_showcase.local_ai.ideation import build_source_profile, run_literature_ideation
-from src.research_systems_showcase.local_ai.local_console import render_console_html
+from src.research_systems_showcase.local_ai.local_console import render_console_html, render_workbench_html
 from src.research_systems_showcase.local_ai.quality import evaluate_local_answer
 from src.research_systems_showcase.local_ai.replay import compare_prefixed_columns
 from src.research_systems_showcase.local_ai.system_monitor import (
@@ -260,30 +260,35 @@ class LocalAIRuntimeTests(unittest.TestCase):
         self.assertIn("does not bypass", advice["policy"])
 
     def test_local_console_html_is_status_only(self) -> None:
-        html = render_console_html(
-            {
-                "created_at": "2026-01-01T00:00:00Z",
-                "summary": {"status": "ok", "advisories": []},
-                "cpu": {"load_average": {"1m": 0.1}, "cpu_count": 8, "load_ratio_1m": 0.012},
-                "memory": {"available_gb": 8.0},
-                "thermal": {"thermal_pressure": "nominal"},
-                "token_usage": {"estimated_total_tokens": estimate_tokens("hello"), "runs_counted": 1},
-                "backends": {},
-                "disk": [],
-                "model_routing": {
-                    "primary_backend": "ollama",
-                    "review_backend": "lmstudio",
-                    "fallback_to_review_backend": True,
-                    "candidates": [],
-                    "advisories": ["Configured model path is available."],
-                    "policy": "Model switching changes draft-generation behavior only.",
-                },
-            }
-        )
+        snapshot = {
+            "created_at": "2026-01-01T00:00:00Z",
+            "summary": {"status": "ok", "advisories": []},
+            "cpu": {"load_average": {"1m": 0.1}, "cpu_count": 8, "load_ratio_1m": 0.012},
+            "memory": {"available_gb": 8.0},
+            "thermal": {"thermal_pressure": "nominal"},
+            "token_usage": {"estimated_total_tokens": estimate_tokens("hello"), "runs_counted": 1},
+            "backends": {},
+            "disk": [],
+            "model_routing": {
+                "primary_backend": "ollama",
+                "review_backend": "lmstudio",
+                "fallback_to_review_backend": True,
+                "candidates": [],
+                "advisories": ["Configured model path is available."],
+                "policy": "Model switching changes draft-generation behavior only.",
+            },
+        }
+        html = render_console_html(snapshot)
 
         self.assertIn("Local Research AI Console", html)
         self.assertIn("no auto-finalization", html)
         self.assertIn("/api/monitor", html)
+
+        workbench = render_workbench_html(snapshot, [])
+        self.assertIn("研究者工作台", workbench)
+        self.assertIn("taskNav", workbench)
+        self.assertIn("conversation", workbench)
+        self.assertIn("review_gate", workbench)
 
     def test_builtin_token_compression_preserves_query_relevant_text(self) -> None:
         text = "\n\n".join(

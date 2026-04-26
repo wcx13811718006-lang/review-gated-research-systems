@@ -33,11 +33,12 @@ Then open:
 http://127.0.0.1:8765
 ```
 
-The console shows:
+The console is now organized as a compact researcher workbench:
 
-- a researcher-facing operation guide
-- compact health cards instead of a long raw terminal log
-- copy buttons for safe commands
+- left command rail for common safe operations
+- center chat-like task workspace for preparing prompts and source paths
+- right inspector for computer status, model status, and recent review-gated runs
+- copy buttons for safe commands generated from the selected task
 - CPU load
 - memory pressure approximation
 - disk space for key paths
@@ -48,7 +49,18 @@ The console shows:
 - safe command examples
 - prompt-compression command examples for lowering draft-generation token cost
 
-The raw diagnostic log is still available under "展开原始诊断日志" for debugging.
+The raw diagnostic log is still available under "原始诊断" for debugging, but it is folded by default so the page does not become one long terminal dump.
+
+## Basic Researcher Workflow
+
+1. Start the console from Finder or terminal.
+2. Check the right-side status panel for CPU, memory, disk, Ollama, and LM Studio.
+3. Choose a task from the left command rail.
+4. Type a research prompt and optional source path in the center workspace.
+5. Click "生成命令" and run the copied command in the terminal.
+6. Inspect the right-side recent runs and the generated `review_gate.json` before treating any output as useful research material.
+
+The console still does not auto-finalize, auto-export, or silently clear review gates.
 
 ## Terminal Monitor
 

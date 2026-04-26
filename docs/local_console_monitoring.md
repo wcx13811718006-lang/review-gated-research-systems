@@ -13,6 +13,16 @@ It is intentionally conservative:
 
 ## Start The Console
 
+From Finder, double-click:
+
+```text
+start_local_ai_console.command
+```
+
+The script starts the local console and opens the browser automatically.
+
+From the terminal:
+
 ```bash
 research-ai-local --config local_ai.config.json console
 ```

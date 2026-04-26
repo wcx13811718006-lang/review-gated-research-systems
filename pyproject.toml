@@ -28,6 +28,9 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules"
 ]
 
+[project.scripts]
+research-ai-local = "research_systems_showcase.local_ai.cli:main"
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 

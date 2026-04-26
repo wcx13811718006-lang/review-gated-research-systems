@@ -91,6 +91,21 @@ python3 -m unittest discover -s tests
 
 The demo writes public-safe artifacts into [`demo/sample_outputs`](./demo/sample_outputs). The runnable path is intentionally small so that a first-time visitor can inspect the whole system quickly.
 
+## Local AI Use
+
+The repository now includes a first local-use layer for Ollama / LM Studio style workflows. It is intentionally review-gated: generated output is written as draft material with audit artifacts, and it is not treated as final research output without validation and human review.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -e .
+cp configs/local_ai.example.json local_ai.config.json
+research-ai-local --config local_ai.config.json status
+research-ai-local --config local_ai.config.json ask "Summarize this repository for a research collaborator." --source README.md
+```
+
+See [`docs/local_deployment.md`](./docs/local_deployment.md) and [`docs/quality_guardrails.md`](./docs/quality_guardrails.md).
+
 ## Demo Path
 
 If you want the shortest inspection route:
@@ -170,6 +185,8 @@ It does not claim to replace faculty judgment, archival verification, domain exp
 - [`docs/review_logic.md`](./docs/review_logic.md)
 - [`docs/evaluation.md`](./docs/evaluation.md)
 - [`docs/case_study.md`](./docs/case_study.md)
+- [`docs/local_deployment.md`](./docs/local_deployment.md)
+- [`docs/quality_guardrails.md`](./docs/quality_guardrails.md)
 - [`diagrams/README.md`](./diagrams/README.md)
 
 ## License And Citation

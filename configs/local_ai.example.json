@@ -1,0 +1,28 @@
+{
+  "primary_backend": "ollama",
+  "review_backend": "lmstudio",
+  "fallback_to_review_backend": true,
+  "outputs_dir": "outputs/local_ai_runs",
+  "max_source_characters_per_file": 4000,
+  "ollama": {
+    "base_url": "http://127.0.0.1:11434",
+    "model": "qwen2.5:7b",
+    "timeout_seconds": 90,
+    "num_predict": 512,
+    "temperature": 0.1
+  },
+  "lmstudio": {
+    "base_url": "http://127.0.0.1:1234",
+    "model": "",
+    "timeout_seconds": 90,
+    "max_tokens": 512,
+    "temperature": 0.1,
+    "disable_thinking": true
+  },
+  "quality_gate": {
+    "allow_final_without_review": false,
+    "require_human_review": true,
+    "minimum_source_context_characters": 200,
+    "minimum_answer_characters": 120
+  }
+}

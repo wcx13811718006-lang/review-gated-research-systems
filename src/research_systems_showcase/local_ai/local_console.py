@@ -1,6 +1,15 @@
 from __future__ import annotations
 
 import json
+import os
+import shlex
+import subprocess
+import sys
+import threading
+import time
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -28,26 +37,31 @@ def _command_cards() -> list[dict[str, str]]:
     return [
         {
             "title": "查看状态",
+            "action": "monitor",
             "when": "先确认电脑负载、模型是否在线、token 使用情况。",
             "command": "research-ai-local --config local_ai.config.json monitor",
         },
         {
             "title": "查看模型",
+            "action": "models",
             "when": "需要判断 Ollama / LM Studio 当前可用模型时使用。",
             "command": "research-ai-local --config local_ai.config.json models",
         },
         {
             "title": "压缩材料",
+            "action": "compress",
             "when": "长文献先压缩，降低草稿生成 token 成本。压缩结果仍需复核。",
             "command": 'research-ai-local --config local_ai.config.json compress --source README.md --query "review-gated workflow"',
         },
         {
             "title": "研究问答草稿",
+            "action": "ask",
             "when": "围绕一份材料生成可复核草稿，不作为最终结论。",
             "command": 'research-ai-local --config local_ai.config.json ask "Draft a review-gated answer." --source README.md',
         },
         {
             "title": "文献创意起点",
+            "action": "ideate",
             "when": "从论文或法律材料提取研究思路，默认进入人工复核。",
             "command": 'research-ai-local --config local_ai.config.json ideate "Generate research ideas." --source /path/to/source.pdf',
         },
@@ -539,6 +553,243 @@ def _runs_payload(recent_runs: list[dict[str, Any]]) -> str:
     return json.dumps({"recent_runs": recent_runs}, ensure_ascii=False)
 
 
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _effective_config_path(repo_root: Path, config_path: Path | None) -> Path | None:
+    if config_path is not None:
+        path = config_path.expanduser()
+        return path if path.is_absolute() else repo_root / path
+    local_config = repo_root / "local_ai.config.json"
+    if local_config.exists():
+        return local_config
+    example_config = repo_root / "configs" / "local_ai.example.json"
+    return example_config if example_config.exists() else None
+
+
+@dataclass
+class ConsoleJob:
+    job_id: str
+    action: str
+    title: str
+    command_display: str
+    argv: list[str]
+    status: str = "queued"
+    stage: str = "queued"
+    created_at: str = field(default_factory=_utc_now)
+    started_at: str = ""
+    completed_at: str = ""
+    started_monotonic: float = 0.0
+    completed_monotonic: float = 0.0
+    return_code: int | None = None
+    pid: int | None = None
+    error: str = ""
+    log_lines: list[str] = field(default_factory=list)
+    backend_snapshot: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        duration = 0.0
+        if self.started_monotonic:
+            end = time.monotonic() if self.status == "running" else self.completed_monotonic
+            duration = max(0.0, end - self.started_monotonic)
+        return {
+            "job_id": self.job_id,
+            "action": self.action,
+            "title": self.title,
+            "command_display": self.command_display,
+            "status": self.status,
+            "stage": self.stage,
+            "created_at": self.created_at,
+            "started_at": self.started_at,
+            "completed_at": self.completed_at,
+            "duration_seconds": round(duration, 1),
+            "return_code": self.return_code,
+            "pid": self.pid,
+            "error": self.error,
+            "log_tail": "\n".join(self.log_lines[-120:]),
+            "backend_snapshot": self.backend_snapshot,
+        }
+
+
+class LocalConsoleJobManager:
+    allowed_actions = {"monitor", "models", "compress", "ask", "ideate"}
+
+    def __init__(self, repo_root: Path, config: dict[str, Any], config_path: Path | None = None) -> None:
+        self.repo_root = repo_root
+        self.config = config
+        self.config_path = _effective_config_path(repo_root, config_path)
+        self.jobs: dict[str, ConsoleJob] = {}
+        self.lock = threading.Lock()
+
+    def list_jobs(self, limit: int = 20) -> list[dict[str, Any]]:
+        with self.lock:
+            jobs = list(self.jobs.values())[-limit:]
+            return [job.to_dict() for job in reversed(jobs)]
+
+    def get_job(self, job_id: str) -> dict[str, Any] | None:
+        with self.lock:
+            job = self.jobs.get(job_id)
+            return job.to_dict() if job else None
+
+    def start_job(self, payload: dict[str, Any]) -> dict[str, Any]:
+        job = self._build_job(payload)
+        with self.lock:
+            self.jobs[job.job_id] = job
+        thread = threading.Thread(target=self._run_job, args=(job.job_id,), daemon=True)
+        thread.start()
+        return job.to_dict()
+
+    def _build_job(self, payload: dict[str, Any]) -> ConsoleJob:
+        action = str(payload.get("action") or "").strip().casefold()
+        if action not in self.allowed_actions:
+            raise ValueError("Unsupported action. Only safe local console actions are allowed.")
+        prompt = str(payload.get("prompt") or "").strip()
+        source = str(payload.get("source") or "").strip()
+
+        argv = [
+            sys.executable,
+            "-m",
+            "src.research_systems_showcase.local_ai.cli",
+        ]
+        if self.config_path is not None:
+            argv.extend(["--config", str(self.config_path)])
+
+        title = action
+        if action == "monitor":
+            title = "查看状态"
+            argv.append("monitor")
+        elif action == "models":
+            title = "查看模型"
+            argv.append("models")
+        elif action == "compress":
+            title = "压缩材料"
+            source_path = self._resolve_source_path(source or "README.md")
+            query = prompt or "review-gated workflow"
+            argv.extend(["compress", "--source", str(source_path), "--query", query])
+        elif action == "ask":
+            title = "研究问答草稿"
+            source_path = self._resolve_source_path(source or "README.md")
+            question = prompt or "Draft a review-gated answer."
+            argv.extend(["ask", question, "--source", str(source_path)])
+        elif action == "ideate":
+            title = "文献创意起点"
+            source_path = self._resolve_source_path(source or "README.md")
+            focus = prompt or "Generate research ideas."
+            argv.extend(["ideate", focus, "--source", str(source_path)])
+
+        return ConsoleJob(
+            job_id=uuid.uuid4().hex[:12],
+            action=action,
+            title=title,
+            command_display=" ".join(shlex.quote(part) for part in argv),
+            argv=argv,
+        )
+
+    def _resolve_source_path(self, source: str) -> Path:
+        path = Path(source).expanduser()
+        if not path.is_absolute():
+            path = self.repo_root / path
+        if not path.exists():
+            raise ValueError(f"Source path does not exist: {path}")
+        if not path.is_file():
+            raise ValueError(f"Source path is not a file: {path}")
+        return path
+
+    def _run_job(self, job_id: str) -> None:
+        with self.lock:
+            job = self.jobs[job_id]
+            job.status = "running"
+            job.stage = "starting local process"
+            job.started_at = _utc_now()
+            job.started_monotonic = time.monotonic()
+            job.backend_snapshot = collect_monitor_snapshot(self.repo_root, self.config).get("backends", {})
+
+        env = os.environ.copy()
+        env["PYTHONUNBUFFERED"] = "1"
+        env.setdefault("PYTHONPYCACHEPREFIX", str(Path(os.environ.get("TMPDIR", "/tmp")) / "research_ai_pycache"))
+        try:
+            process = subprocess.Popen(
+                job.argv,
+                cwd=self.repo_root,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+        except OSError as exc:
+            self._fail_job(job_id, f"Failed to start process: {exc}")
+            return
+
+        with self.lock:
+            job = self.jobs[job_id]
+            job.pid = process.pid
+            job.stage = "running local model/helper command"
+            job.log_lines.append(f"Started PID {process.pid}: {job.command_display}")
+
+        assert process.stdout is not None
+        for line in process.stdout:
+            clean = line.rstrip()
+            if not clean:
+                continue
+            self._append_log(job_id, clean)
+            self._infer_stage(job_id, clean)
+
+        return_code = process.wait()
+        with self.lock:
+            job = self.jobs[job_id]
+            job.return_code = return_code
+            job.completed_at = _utc_now()
+            job.completed_monotonic = time.monotonic()
+            job.status = "completed" if return_code == 0 else "failed"
+            job.stage = "completed" if return_code == 0 else "failed"
+            if return_code != 0 and not job.error:
+                job.error = f"Process exited with code {return_code}"
+
+    def _append_log(self, job_id: str, line: str) -> None:
+        with self.lock:
+            job = self.jobs[job_id]
+            job.log_lines.append(line)
+            if len(job.log_lines) > 240:
+                job.log_lines = job.log_lines[-240:]
+
+    def _infer_stage(self, job_id: str, line: str) -> None:
+        normalized = line.casefold()
+        stage = ""
+        if "local ai run completed" in normalized:
+            stage = "writing review-gated artifacts"
+        elif "backend:" in normalized:
+            stage = "model backend reported"
+        elif "decision:" in normalized or "review required:" in normalized:
+            stage = "review gate evaluated"
+        elif "artifacts:" in normalized:
+            stage = "artifact paths available"
+        elif "compression completed" in normalized:
+            stage = "compression completed"
+        elif "local research ai monitor" in normalized:
+            stage = "monitor snapshot ready"
+        elif "model routing status" in normalized:
+            stage = "model routing checked"
+        if stage:
+            with self.lock:
+                self.jobs[job_id].stage = stage
+
+    def _fail_job(self, job_id: str, error: str) -> None:
+        with self.lock:
+            job = self.jobs[job_id]
+            job.status = "failed"
+            job.stage = "failed"
+            job.error = error
+            job.completed_at = _utc_now()
+            job.completed_monotonic = time.monotonic()
+            job.log_lines.append(error)
+
+
+def _jobs_payload(jobs: list[dict[str, Any]]) -> str:
+    return json.dumps({"jobs": jobs}, ensure_ascii=False)
+
+
 def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, Any]]) -> str:
     monitor_summary = escape(render_monitor_summary(snapshot))
     summary = snapshot.get("summary", {})
@@ -623,7 +874,7 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       display: grid;
       gap: 8px;
     }}
-    .nav button, .copy-btn, .primary-btn {{
+    .nav button, .copy-btn, .primary-btn, .secondary-btn {{
       border: 0;
       border-radius: 12px;
       cursor: pointer;
@@ -725,6 +976,59 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       background: var(--green);
       color: white;
       padding: 12px 14px;
+    }}
+    .secondary-btn {{
+      background: #e6eee6;
+      color: var(--green);
+      padding: 12px 14px;
+    }}
+    .button-stack {{
+      display: grid;
+      gap: 9px;
+      align-content: stretch;
+    }}
+    .bubble.feedback {{
+      display: none;
+      max-width: 960px;
+      background: #fffdf7;
+      color: var(--ink);
+      border-color: var(--line);
+    }}
+    .job-meta {{
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 8px 0;
+    }}
+    .job-chip {{
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: #e8e1d5;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }}
+    .job-chip.running {{
+      background: #dfeee5;
+      color: var(--green);
+    }}
+    .job-chip.failed {{
+      background: #fff0d6;
+      color: var(--amber);
+    }}
+    .job-row {{
+      display: grid;
+      gap: 4px;
+      padding: 10px 0;
+      border-top: 1px solid #eadfce;
+    }}
+    .job-row:first-child {{
+      border-top: 0;
+    }}
+    .job-row strong {{
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
     }}
     .inspector {{
       display: grid;
@@ -865,7 +1169,12 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       <section class="conversation" id="conversation">
         <div class="bubble assistant">
           <strong>怎么开始</strong>
-          <p>从左侧选择任务。这里会生成一条安全命令，你可以复制后在启动脚本的终端窗口运行。所有模型结果仍然需要 review gate 和人工判断。</p>
+          <p>从左侧选择任务。可以只生成命令，也可以点击“运行并看反馈”让本地白名单任务在后台执行。所有模型结果仍然需要 review gate 和人工判断。</p>
+        </div>
+        <div class="bubble feedback" id="liveJob">
+          <strong id="liveJobTitle">任务反馈</strong>
+          <div class="job-meta" id="liveJobMeta"></div>
+          <pre id="liveJobLog">等待任务启动。</pre>
         </div>
       </section>
       <section class="composer">
@@ -873,7 +1182,10 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
           <textarea id="researchPrompt" placeholder="输入研究问题、文献任务或审阅目标。例如：根据这篇论文提出三个可验证研究思路。"></textarea>
           <input id="sourcePath" placeholder="材料路径，可选。例如：/path/to/source.pdf 或 README.md">
         </div>
-        <button class="primary-btn" type="button" onclick="composeSelected()">生成命令</button>
+        <div class="button-stack">
+          <button class="primary-btn" type="button" onclick="runSelected()">运行并看反馈</button>
+          <button class="secondary-btn" type="button" onclick="composeSelected()">只生成命令</button>
+        </div>
       </section>
     </main>
     <aside class="inspector">
@@ -895,6 +1207,15 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
         <div id="runList">{run_items}</div>
       </section>
       <section class="panel">
+        <h2>任务进度</h2>
+        <div id="jobList">
+          <div class="empty-state">
+            <strong>暂无后台任务</strong>
+            <span>点击“运行并看反馈”后，这里会显示进度、PID、状态和耗时。</span>
+          </div>
+        </div>
+      </section>
+      <section class="panel">
         <h2>原始诊断</h2>
         <details>
           <summary>展开日志</summary>
@@ -907,6 +1228,7 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
   <script>
     const TASKS = {command_json};
     let selectedTask = TASKS[3];
+    let activeJobId = null;
 
     function renderNav() {{
       const nav = document.getElementById('taskNav');
@@ -945,7 +1267,7 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       conversation.scrollTop = conversation.scrollHeight;
     }}
 
-    function composeSelected() {{
+    function buildCommand() {{
       const prompt = document.getElementById('researchPrompt').value.trim();
       const source = document.getElementById('sourcePath').value.trim();
       let command = selectedTask.command;
@@ -955,8 +1277,42 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       if (source) {{
         command = command.replace('README.md', source).replace('/path/to/source.pdf', source);
       }}
+      return command;
+    }}
+
+    function composeSelected() {{
+      const command = buildCommand();
       addAssistant('下面是当前任务的安全运行命令。运行后请查看右侧最近运行和 review_gate。', command);
       copyText(command);
+    }}
+
+    async function runSelected() {{
+      const prompt = document.getElementById('researchPrompt').value.trim();
+      const source = document.getElementById('sourcePath').value.trim();
+      const command = buildCommand();
+      addAssistant('正在启动本地白名单任务。这里不会绕过 review gate，也不会自动最终化输出。', command);
+      try {{
+        const response = await fetch('/api/jobs', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{
+            action: selectedTask.action,
+            prompt: prompt,
+            source: source
+          }})
+        }});
+        const payload = await response.json();
+        if (!response.ok) {{
+          addAssistant('任务未启动：' + (payload.error || response.statusText));
+          return;
+        }}
+        activeJobId = payload.job.job_id;
+        renderActiveJob(payload.job);
+        addAssistant('任务已启动：' + payload.job.title + '。右侧“任务进度”和中间“任务反馈”会自动刷新。');
+        refreshJobs();
+      }} catch (error) {{
+        addAssistant('任务启动失败：' + error);
+      }}
     }}
 
     function copyText(text) {{
@@ -977,6 +1333,26 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
         }}
       }} catch (error) {{
         document.getElementById('rawStatus').textContent = 'Status refresh failed: ' + error;
+      }}
+    }}
+
+    async function refreshJobs() {{
+      try {{
+        const response = await fetch('/api/jobs');
+        const payload = await response.json();
+        renderJobs(payload.jobs || []);
+        if (activeJobId) {{
+          const active = (payload.jobs || []).find((job) => job.job_id === activeJobId);
+          if (active) {{
+            renderActiveJob(active);
+            if (active.status === 'completed' || active.status === 'failed') {{
+              refreshStatus();
+            }}
+          }}
+        }}
+      }} catch (error) {{
+        const jobList = document.getElementById('jobList');
+        jobList.innerHTML = '<div class="empty-state"><strong>任务状态刷新失败</strong><span>' + escapeHtml(String(error)) + '</span></div>';
       }}
     }}
 
@@ -1005,8 +1381,91 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       }});
     }}
 
+    function renderJobs(jobs) {{
+      const jobList = document.getElementById('jobList');
+      if (!jobs || jobs.length === 0) {{
+        jobList.innerHTML = '<div class="empty-state"><strong>暂无后台任务</strong><span>点击“运行并看反馈”后，这里会显示进度、PID、状态和耗时。</span></div>';
+        return;
+      }}
+      jobList.innerHTML = '';
+      jobs.slice(0, 8).forEach((job) => {{
+        const row = document.createElement('article');
+        row.className = 'job-row';
+        const title = document.createElement('strong');
+        title.innerHTML = '<span>' + escapeHtml(job.title || job.action || 'job') + '</span><span class="job-chip ' + escapeHtml(job.status || '') + '">' + escapeHtml(job.status || 'unknown') + '</span>';
+        const stage = document.createElement('span');
+        stage.textContent = job.stage || '';
+        const meta = document.createElement('small');
+        meta.textContent = 'id ' + (job.job_id || '') + ' · pid ' + (job.pid || 'n/a') + ' · ' + (job.duration_seconds || 0) + 's';
+        row.onclick = () => {{
+          activeJobId = job.job_id;
+          renderActiveJob(job);
+        }};
+        row.appendChild(title);
+        row.appendChild(stage);
+        row.appendChild(meta);
+        jobList.appendChild(row);
+      }});
+    }}
+
+    function renderActiveJob(job) {{
+      const live = document.getElementById('liveJob');
+      const title = document.getElementById('liveJobTitle');
+      const meta = document.getElementById('liveJobMeta');
+      const log = document.getElementById('liveJobLog');
+      live.style.display = 'block';
+      title.textContent = '任务反馈：' + (job.title || job.action || '本地任务');
+      meta.innerHTML = '';
+      [
+        '状态 ' + (job.status || 'unknown'),
+        '阶段 ' + (job.stage || 'unknown'),
+        'PID ' + (job.pid || 'n/a'),
+        '耗时 ' + (job.duration_seconds || 0) + 's'
+      ].forEach((item) => {{
+        const chip = document.createElement('span');
+        chip.className = 'job-chip ' + (job.status || '');
+        chip.textContent = item;
+        meta.appendChild(chip);
+      }});
+      if (job.backend_snapshot) {{
+        Object.keys(job.backend_snapshot).forEach((name) => {{
+          const backend = job.backend_snapshot[name] || {{}};
+          const chip = document.createElement('span');
+          chip.className = 'job-chip';
+          chip.textContent = name + ' ' + (backend.status_label || 'unknown') + ' · ' + (backend.effective_model || 'no model');
+          meta.appendChild(chip);
+        }});
+      }}
+      const lines = [];
+      lines.push(job.command_display || '');
+      if (job.error) {{
+        lines.push('');
+        lines.push('ERROR: ' + job.error);
+      }}
+      if (job.log_tail) {{
+        lines.push('');
+        lines.push(job.log_tail);
+      }} else {{
+        lines.push('');
+        lines.push('任务已创建，等待第一条输出。模型调用时可能有一段时间没有新日志。');
+      }}
+      log.textContent = lines.join('\\n');
+      log.scrollTop = log.scrollHeight;
+    }}
+
+    function escapeHtml(text) {{
+      return text
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }}
+
     renderNav();
+    refreshJobs();
     setInterval(refreshStatus, 10000);
+    setInterval(refreshJobs, 2000);
   </script>
 </body>
 </html>
@@ -1014,9 +1473,10 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
 
 
 class LocalConsoleServer:
-    def __init__(self, repo_root: Path, config: dict[str, Any]) -> None:
+    def __init__(self, repo_root: Path, config: dict[str, Any], config_path: Path | None = None) -> None:
         self.repo_root = repo_root
         self.config = config
+        self.job_manager = LocalConsoleJobManager(repo_root=repo_root, config=config, config_path=config_path)
 
     def handler_class(self) -> type[BaseHTTPRequestHandler]:
         console = self
@@ -1032,6 +1492,19 @@ class LocalConsoleServer:
                 self.send_header("Content-Length", str(len(encoded)))
                 self.end_headers()
                 self.wfile.write(encoded)
+
+            def _send_json(self, status: int, payload: dict[str, Any]) -> None:
+                self._send(status, json.dumps(payload, ensure_ascii=False), "application/json")
+
+            def _read_json_body(self) -> dict[str, Any]:
+                length = int(self.headers.get("Content-Length", "0") or "0")
+                if length > 65536:
+                    raise ValueError("Request body is too large.")
+                raw = self.rfile.read(length) if length else b"{}"
+                payload = json.loads(raw.decode("utf-8"))
+                if not isinstance(payload, dict):
+                    raise ValueError("Request body must be a JSON object.")
+                return payload
 
             def do_GET(self) -> None:
                 if self.path in {"/", "/index.html"}:
@@ -1053,6 +1526,29 @@ class LocalConsoleServer:
                     recent_runs = collect_recent_runs(console.repo_root, console.config)
                     self._send(200, _runs_payload(recent_runs), "application/json")
                     return
+                if self.path == "/api/jobs":
+                    self._send(200, _jobs_payload(console.job_manager.list_jobs()), "application/json")
+                    return
+                if self.path.startswith("/api/jobs/"):
+                    job_id = self.path.removeprefix("/api/jobs/")
+                    job = console.job_manager.get_job(job_id)
+                    if job is None:
+                        self._send_json(404, {"error": "Job not found."})
+                    else:
+                        self._send_json(200, {"job": job})
+                    return
+                self._send(404, "Not found", "text/plain")
+
+            def do_POST(self) -> None:
+                if self.path == "/api/jobs":
+                    try:
+                        payload = self._read_json_body()
+                        job = console.job_manager.start_job(payload)
+                    except (ValueError, json.JSONDecodeError) as exc:
+                        self._send_json(400, {"error": str(exc)})
+                        return
+                    self._send_json(202, {"job": job})
+                    return
                 self._send(404, "Not found", "text/plain")
 
         return Handler
@@ -1061,15 +1557,16 @@ class LocalConsoleServer:
 def run_local_console(
     repo_root: Path,
     config: dict[str, Any],
+    config_path: Path | None = None,
     host: str = "127.0.0.1",
     port: int = 8765,
 ) -> None:
     if host not in {"127.0.0.1", "localhost"}:
         raise ValueError("Local console is restricted to 127.0.0.1 / localhost.")
-    console = LocalConsoleServer(repo_root=repo_root, config=config)
+    console = LocalConsoleServer(repo_root=repo_root, config=config, config_path=config_path)
     server = ThreadingHTTPServer((host, port), console.handler_class())
     print(f"Local Research AI Console: http://{host}:{port}")
-    print("Press Ctrl+C to stop. The console is status-only and review-gated.")
+    print("Press Ctrl+C to stop. The console runs only whitelisted local actions and remains review-gated.")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

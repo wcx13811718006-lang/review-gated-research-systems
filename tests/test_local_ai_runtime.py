@@ -13,7 +13,11 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.research_systems_showcase.local_ai.assistant import run_local_research_prompt
 from src.research_systems_showcase.local_ai.ideation import build_source_profile, run_literature_ideation
-from src.research_systems_showcase.local_ai.local_console import render_console_html, render_workbench_html
+from src.research_systems_showcase.local_ai.local_console import (
+    LocalConsoleJobManager,
+    render_console_html,
+    render_workbench_html,
+)
 from src.research_systems_showcase.local_ai.quality import evaluate_local_answer
 from src.research_systems_showcase.local_ai.replay import compare_prefixed_columns
 from src.research_systems_showcase.local_ai.system_monitor import (
@@ -289,6 +293,19 @@ class LocalAIRuntimeTests(unittest.TestCase):
         self.assertIn("taskNav", workbench)
         self.assertIn("conversation", workbench)
         self.assertIn("review_gate", workbench)
+        self.assertIn("/api/jobs", workbench)
+        self.assertIn("运行并看反馈", workbench)
+
+    def test_local_console_jobs_only_build_safe_whitelisted_commands(self) -> None:
+        manager = LocalConsoleJobManager(repo_root=PROJECT_ROOT, config={}, config_path=PROJECT_ROOT / "configs" / "local_ai.example.json")
+        job = manager._build_job({"action": "monitor"})
+
+        self.assertIn("src.research_systems_showcase.local_ai.cli", job.argv)
+        self.assertIn("monitor", job.argv)
+        self.assertNotIn(";", job.command_display)
+
+        with self.assertRaises(ValueError):
+            manager._build_job({"action": "rm -rf /"})
 
     def test_builtin_token_compression_preserves_query_relevant_text(self) -> None:
         text = "\n\n".join(

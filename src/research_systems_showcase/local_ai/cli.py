@@ -101,7 +101,7 @@ def main() -> None:
                 print(f"\nSnapshot written to: {snapshot['written_to']}")
         return
     if args.command == "console":
-        run_local_console(repo_root=repo_root, config=config, host=args.host, port=args.port)
+        run_local_console(repo_root=repo_root, config=config, config_path=args.config, host=args.host, port=args.port)
         return
     if args.command == "compress":
         result = compress_file_action(

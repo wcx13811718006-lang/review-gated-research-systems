@@ -14,6 +14,7 @@ from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 from .system_monitor import collect_monitor_snapshot, render_monitor_summary
 
@@ -575,6 +576,9 @@ class ConsoleJob:
     title: str
     command_display: str
     argv: list[str]
+    job_number: int = 0
+    prompt: str = ""
+    source: str = ""
     status: str = "queued"
     stage: str = "queued"
     created_at: str = field(default_factory=_utc_now)
@@ -595,8 +599,11 @@ class ConsoleJob:
             duration = max(0.0, end - self.started_monotonic)
         return {
             "job_id": self.job_id,
+            "job_number": self.job_number,
             "action": self.action,
             "title": self.title,
+            "prompt": self.prompt,
+            "source": self.source,
             "command_display": self.command_display,
             "status": self.status,
             "stage": self.stage,
@@ -635,6 +642,18 @@ class ConsoleJob:
 
 class LocalConsoleJobManager:
     allowed_actions = {"monitor", "models", "compress", "ask", "ideate"}
+    folder_source_limit = 20
+    folder_source_suffixes = {
+        ".txt",
+        ".md",
+        ".csv",
+        ".json",
+        ".pdf",
+        ".docx",
+        ".rtf",
+        ".html",
+        ".htm",
+    }
 
     def __init__(self, repo_root: Path, config: dict[str, Any], config_path: Path | None = None) -> None:
         self.repo_root = repo_root
@@ -656,6 +675,7 @@ class LocalConsoleJobManager:
     def start_job(self, payload: dict[str, Any]) -> dict[str, Any]:
         job = self._build_job(payload)
         with self.lock:
+            job.job_number = len(self.jobs) + 1
             self.jobs[job.job_id] = job
         thread = threading.Thread(target=self._run_job, args=(job.job_id,), daemon=True)
         thread.start()
@@ -677,6 +697,8 @@ class LocalConsoleJobManager:
             argv.extend(["--config", str(self.config_path)])
 
         title = action
+        prompt_display = prompt
+        source_display = source
         if action == "monitor":
             title = "查看状态"
             argv.append("monitor")
@@ -687,17 +709,27 @@ class LocalConsoleJobManager:
             title = "压缩材料"
             source_path = self._resolve_source_path(source or "README.md")
             query = prompt or "review-gated workflow"
+            prompt_display = query
+            source_display = str(source_path)
             argv.extend(["compress", "--source", str(source_path), "--query", query])
         elif action == "ask":
             title = "研究问答草稿"
-            source_path = self._resolve_source_path(source or "README.md")
+            source_paths = self._resolve_source_paths(source or "README.md", allow_folder=True)
             question = prompt or "Draft a review-gated answer."
-            argv.extend(["ask", question, "--source", str(source_path)])
+            prompt_display = question
+            source_display = self._source_display(source or "README.md", source_paths)
+            argv.extend(["ask", question])
+            for source_path in source_paths:
+                argv.extend(["--source", str(source_path)])
         elif action == "ideate":
             title = "文献创意起点"
-            source_path = self._resolve_source_path(source or "README.md")
+            source_paths = self._resolve_source_paths(source or "README.md", allow_folder=True)
             focus = prompt or "Generate research ideas."
-            argv.extend(["ideate", focus, "--source", str(source_path)])
+            prompt_display = focus
+            source_display = self._source_display(source or "README.md", source_paths)
+            argv.extend(["ideate", focus])
+            for source_path in source_paths:
+                argv.extend(["--source", str(source_path)])
 
         return ConsoleJob(
             job_id=uuid.uuid4().hex[:12],
@@ -705,6 +737,8 @@ class LocalConsoleJobManager:
             title=title,
             command_display=" ".join(shlex.quote(part) for part in argv),
             argv=argv,
+            prompt=prompt_display,
+            source=source_display,
         )
 
     def _resolve_source_path(self, source: str) -> Path:
@@ -716,6 +750,36 @@ class LocalConsoleJobManager:
         if not path.is_file():
             raise ValueError(f"Source path is not a file: {path}")
         return path
+
+    def _resolve_source_paths(self, source: str, allow_folder: bool = False) -> list[Path]:
+        path = Path(source).expanduser()
+        if not path.is_absolute():
+            path = self.repo_root / path
+        if path.is_file():
+            return [path]
+        if path.is_dir() and allow_folder:
+            candidates = [
+                item
+                for item in sorted(path.rglob("*"))
+                if item.is_file()
+                and not item.name.startswith(".")
+                and item.suffix.lower() in self.folder_source_suffixes
+            ]
+            if not candidates:
+                raise ValueError(f"No supported source files were found in folder: {path}")
+            return candidates[: self.folder_source_limit]
+        if path.is_dir():
+            raise ValueError(f"This action accepts one file, not a folder: {path}")
+        raise ValueError(f"Source path does not exist: {path}")
+
+    def _source_display(self, original_source: str, source_paths: list[Path]) -> str:
+        path = Path(original_source).expanduser()
+        if not path.is_absolute():
+            path = self.repo_root / path
+        if path.is_dir():
+            suffix = "file" if len(source_paths) == 1 else "files"
+            return f"{path} ({len(source_paths)} {suffix} selected)"
+        return str(source_paths[0]) if source_paths else str(path)
 
     def _run_job(self, job_id: str) -> None:
         with self.lock:
@@ -809,6 +873,27 @@ class LocalConsoleJobManager:
 
 def _jobs_payload(jobs: list[dict[str, Any]]) -> str:
     return json.dumps({"jobs": jobs}, ensure_ascii=False)
+
+
+def _choose_path_with_finder(kind: str) -> str:
+    if kind == "folder":
+        script = 'POSIX path of (choose folder with prompt "选择要处理的文件夹")'
+    else:
+        script = 'POSIX path of (choose file with prompt "选择要处理的文件")'
+    try:
+        result = subprocess.run(
+            ["/usr/bin/osascript", "-e", script],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ValueError(f"Finder selection failed: {exc}") from exc
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "Finder selection was cancelled."
+        raise ValueError(detail)
+    return result.stdout.strip()
 
 
 def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, Any]]) -> str:
@@ -993,6 +1078,22 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       min-height: 78px;
       resize: vertical;
     }}
+    .source-picker {{
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 8px;
+      margin-top: 8px;
+    }}
+    .picker-btn {{
+      border: 1px solid #d8cbb9;
+      border-radius: 12px;
+      background: #f1eadf;
+      color: var(--green);
+      cursor: pointer;
+      font: inherit;
+      font-weight: 800;
+      padding: 0 11px;
+    }}
     .primary-btn {{
       background: var(--green);
       color: white;
@@ -1023,6 +1124,30 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       justify-content: space-between;
       gap: 12px;
       align-items: center;
+    }}
+    .active-job-label {{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: var(--black);
+      color: #f7fbf6;
+      font-size: 12px;
+      font-weight: 850;
+    }}
+    .job-identity {{
+      display: grid;
+      gap: 5px;
+      margin-top: 8px;
+      padding: 9px 10px;
+      border-radius: 12px;
+      background: #f1eadf;
+      color: var(--muted);
+      font-size: 13px;
+    }}
+    .job-identity strong {{
+      color: var(--ink);
     }}
     .feedback-dock pre {{
       max-height: 120px;
@@ -1065,6 +1190,10 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       background: #fff0d6;
       color: var(--amber);
     }}
+    .job-chip.current {{
+      background: var(--black);
+      color: #fff;
+    }}
     .job-row {{
       display: grid;
       gap: 4px;
@@ -1073,10 +1202,15 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       cursor: pointer;
     }}
     .job-row.active {{
-      background: #eef5ee;
+      background: #ddebe1;
       margin: 0 -8px;
       padding: 10px 8px;
       border-radius: 12px;
+      outline: 2px solid rgba(31, 90, 69, 0.24);
+    }}
+    .job-row.running {{
+      border-left: 4px solid var(--green);
+      padding-left: 8px;
     }}
     .job-row:first-child {{
       border-top: 0;
@@ -1231,8 +1365,11 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       <section class="feedback-dock" id="liveJob">
         <header>
           <strong id="liveJobTitle">任务反馈</strong>
-          <span class="muted">固定显示当前任务，不需要翻聊天记录</span>
+          <span class="active-job-label" id="activeJobLabel">当前无任务</span>
         </header>
+        <div class="job-identity" id="liveJobIdentity">
+          <span>启动任务后，这里会显示任务编号、job id、输入内容和材料路径。</span>
+        </div>
         <div class="job-meta" id="liveJobMeta">
           <span class="job-chip">等待任务</span>
         </div>
@@ -1244,7 +1381,11 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       <section class="composer">
         <div>
           <textarea id="researchPrompt" placeholder="输入研究问题、文献任务或审阅目标。例如：根据这篇论文提出三个可验证研究思路。"></textarea>
-          <input id="sourcePath" placeholder="材料路径，可选。例如：/path/to/source.pdf 或 README.md">
+          <div class="source-picker">
+            <input id="sourcePath" placeholder="材料路径，可选。例如：/path/to/source.pdf 或 README.md">
+            <button class="picker-btn" type="button" onclick="choosePath('file')">选择文件</button>
+            <button class="picker-btn" type="button" onclick="choosePath('folder')">选择文件夹</button>
+          </div>
         </div>
         <div class="button-stack">
           <button class="primary-btn" type="button" onclick="runSelected()">运行并看反馈</button>
@@ -1351,6 +1492,21 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       copyText(command);
     }}
 
+    async function choosePath(kind) {{
+      try {{
+        const response = await fetch('/api/pick-path?kind=' + encodeURIComponent(kind));
+        const payload = await response.json();
+        if (!response.ok) {{
+          addAssistant('Finder 选择未完成：' + (payload.error || response.statusText));
+          return;
+        }}
+        document.getElementById('sourcePath').value = payload.path || '';
+        addAssistant((kind === 'folder' ? '已选择文件夹：' : '已选择文件：') + (payload.path || ''));
+      }} catch (error) {{
+        addAssistant('Finder 选择失败：' + error);
+      }}
+    }}
+
     async function runSelected() {{
       const prompt = document.getElementById('researchPrompt').value.trim();
       const source = document.getElementById('sourcePath').value.trim();
@@ -1368,6 +1524,7 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
         }});
         const payload = await response.json();
         if (!response.ok) {{
+          renderLaunchError(payload.error || response.statusText, prompt, source);
           addAssistant('任务未启动：' + (payload.error || response.statusText));
           return;
         }}
@@ -1407,7 +1564,8 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
         const payload = await response.json();
         const jobs = payload.jobs || [];
         if (!activeJobId && jobs.length > 0) {{
-          activeJobId = jobs[0].job_id;
+          const running = jobs.find((job) => job.status === 'running');
+          activeJobId = (running || jobs[0]).job_id;
         }}
         renderJobs(jobs);
         if (activeJobId) {{
@@ -1459,20 +1617,27 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       jobList.innerHTML = '';
       jobs.slice(0, 8).forEach((job) => {{
         const row = document.createElement('article');
-        row.className = 'job-row' + (job.job_id === activeJobId ? ' active' : '');
+        row.className = 'job-row' + (job.job_id === activeJobId ? ' active' : '') + (job.status === 'running' ? ' running' : '');
         const title = document.createElement('strong');
-        title.innerHTML = '<span>' + escapeHtml(job.title || job.action || 'job') + '</span><span class="job-chip ' + escapeHtml(job.status || '') + '">' + escapeHtml(job.status || 'unknown') + '</span>';
+        const label = jobLabel(job);
+        const chipText = job.job_id === activeJobId ? '当前显示' : (job.status === 'running' ? '正在运行' : (job.status || 'unknown'));
+        const chipClass = job.job_id === activeJobId ? 'current' : (job.status || '');
+        title.innerHTML = '<span>' + escapeHtml(label) + '</span><span class="job-chip ' + escapeHtml(chipClass) + '">' + escapeHtml(chipText) + '</span>';
         const stage = document.createElement('span');
         stage.textContent = job.stage || '';
         const meta = document.createElement('small');
-        meta.textContent = 'id ' + (job.job_id || '') + ' · pid ' + (job.pid || 'n/a') + ' · ' + (job.duration_seconds || 0) + 's';
+        meta.textContent = 'job id ' + (job.job_id || '') + ' · pid ' + (job.pid || 'n/a') + ' · ' + (job.duration_seconds || 0) + 's';
+        const taskInput = document.createElement('small');
+        taskInput.textContent = (job.prompt || '').slice(0, 90) || 'no prompt';
         row.onclick = () => {{
           activeJobId = job.job_id;
           renderActiveJob(job);
+          renderJobs(jobs);
         }};
         row.appendChild(title);
         row.appendChild(stage);
         row.appendChild(meta);
+        row.appendChild(taskInput);
         jobList.appendChild(row);
       }});
     }}
@@ -1480,10 +1645,18 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
     function renderActiveJob(job) {{
       const live = document.getElementById('liveJob');
       const title = document.getElementById('liveJobTitle');
+      const label = document.getElementById('activeJobLabel');
+      const identity = document.getElementById('liveJobIdentity');
       const meta = document.getElementById('liveJobMeta');
       const summary = document.getElementById('liveJobSummary');
       const log = document.getElementById('liveJobLog');
-      title.textContent = '任务反馈：' + (job.title || job.action || '本地任务');
+      title.textContent = '任务反馈：' + jobLabel(job);
+      label.textContent = (job.status === 'running' ? '正在运行 ' : '当前显示 ') + jobLabel(job);
+      identity.innerHTML = [
+        '<span><strong>Job ID:</strong> ' + escapeHtml(job.job_id || '') + '</span>',
+        '<span><strong>输入:</strong> ' + escapeHtml(job.prompt || '无') + '</span>',
+        '<span><strong>材料:</strong> ' + escapeHtml(job.source || '无') + '</span>'
+      ].join('');
       meta.innerHTML = '';
       [
         '状态 ' + (job.status || 'unknown'),
@@ -1521,6 +1694,30 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       }}
       log.textContent = lines.join('\\n');
       log.scrollTop = log.scrollHeight;
+    }}
+
+    function renderLaunchError(error, prompt, source) {{
+      const title = document.getElementById('liveJobTitle');
+      const label = document.getElementById('activeJobLabel');
+      const identity = document.getElementById('liveJobIdentity');
+      const meta = document.getElementById('liveJobMeta');
+      const summary = document.getElementById('liveJobSummary');
+      const log = document.getElementById('liveJobLog');
+      title.textContent = '任务未启动：' + (selectedTask.title || selectedTask.action || '本地任务');
+      label.textContent = '未启动';
+      identity.innerHTML = [
+        '<span><strong>任务:</strong> ' + escapeHtml(selectedTask.title || '') + '</span>',
+        '<span><strong>输入:</strong> ' + escapeHtml(prompt || '无') + '</span>',
+        '<span><strong>材料:</strong> ' + escapeHtml(source || 'README.md') + '</span>'
+      ].join('');
+      meta.innerHTML = '<span class="job-chip failed">未启动</span>';
+      summary.innerHTML = '<span><strong>原因:</strong> ' + escapeHtml(error || 'unknown error') + '</span>';
+      log.textContent = '任务没有进入后台队列。请检查材料路径，或点击“选择文件 / 选择文件夹”重新选择。';
+    }}
+
+    function jobLabel(job) {{
+      const number = job.job_number ? '#' + job.job_number + ' ' : '';
+      return number + (job.title || job.action || '本地任务');
     }}
 
     function renderResultSummary(container, job) {{
@@ -1598,12 +1795,14 @@ class LocalConsoleServer:
                 return payload
 
             def do_GET(self) -> None:
-                if self.path in {"/", "/index.html"}:
+                parsed = urlparse(self.path)
+                request_path = parsed.path
+                if request_path in {"/", "/index.html"}:
                     snapshot = collect_monitor_snapshot(console.repo_root, console.config)
                     recent_runs = collect_recent_runs(console.repo_root, console.config)
                     self._send(200, render_workbench_html(snapshot, recent_runs), "text/html")
                     return
-                if self.path == "/api/monitor":
+                if request_path == "/api/monitor":
                     snapshot = collect_monitor_snapshot(console.repo_root, console.config)
                     recent_runs = collect_recent_runs(console.repo_root, console.config)
                     payload = {
@@ -1613,20 +1812,33 @@ class LocalConsoleServer:
                     }
                     self._send(200, json.dumps(payload, ensure_ascii=False), "application/json")
                     return
-                if self.path == "/api/runs":
+                if request_path == "/api/runs":
                     recent_runs = collect_recent_runs(console.repo_root, console.config)
                     self._send(200, _runs_payload(recent_runs), "application/json")
                     return
-                if self.path == "/api/jobs":
+                if request_path == "/api/jobs":
                     self._send(200, _jobs_payload(console.job_manager.list_jobs()), "application/json")
                     return
-                if self.path.startswith("/api/jobs/"):
-                    job_id = self.path.removeprefix("/api/jobs/")
+                if request_path.startswith("/api/jobs/"):
+                    job_id = request_path.removeprefix("/api/jobs/")
                     job = console.job_manager.get_job(job_id)
                     if job is None:
                         self._send_json(404, {"error": "Job not found."})
                     else:
                         self._send_json(200, {"job": job})
+                    return
+                if request_path == "/api/pick-path":
+                    query = parse_qs(parsed.query)
+                    kind = (query.get("kind") or ["file"])[0]
+                    if kind not in {"file", "folder"}:
+                        self._send_json(400, {"error": "kind must be file or folder."})
+                        return
+                    try:
+                        selected_path = _choose_path_with_finder(kind)
+                    except ValueError as exc:
+                        self._send_json(400, {"error": str(exc)})
+                        return
+                    self._send_json(200, {"path": selected_path, "kind": kind})
                     return
                 self._send(404, "Not found", "text/plain")
 

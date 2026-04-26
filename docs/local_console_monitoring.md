@@ -41,6 +41,8 @@ The console is now organized as a compact researcher workbench:
 - copy buttons for safe commands generated from the selected task
 - a "运行并看反馈" path for running only whitelisted local actions from the browser
 - a task progress panel with status, stage, process ID, elapsed time, and live stdout/stderr tail
+- visible task numbers, job IDs, prompt text, and selected source paths so the current task is identifiable
+- Finder-backed "选择文件" and "选择文件夹" buttons for local source selection
 - CPU load
 - memory pressure approximation
 - disk space for key paths
@@ -58,14 +60,16 @@ The raw diagnostic log is still available under "原始诊断" for debugging, bu
 1. Start the console from Finder or terminal.
 2. Check the right-side status panel for CPU, memory, disk, Ollama, and LM Studio.
 3. Choose a task from the left command rail.
-4. Type a research prompt and optional source path in the center workspace.
+4. Type a research prompt and either type a source path or use "选择文件" / "选择文件夹".
 5. Click "运行并看反馈" to start a safe local background task, or click "只生成命令" if you prefer to run it manually in Terminal.
-6. Watch the center "任务反馈" log and the right-side "任务进度" panel.
+6. Watch the center "任务反馈" log and the right-side "任务进度" panel. Match them by task number and job ID.
 7. Inspect the right-side recent runs and the generated `review_gate.json` before treating any output as useful research material.
 
 The console still does not auto-finalize, auto-export, or silently clear review gates.
 
 The browser runner is intentionally narrow. It only starts the local actions already exposed by this repository: monitor, models, compress, ask, and ideate. It does not execute arbitrary shell commands.
+
+Folder selection is conservative. For ask and ideate tasks, the console expands a selected folder into supported source files up to a small limit. Compression remains single-file only.
 
 ## Terminal Monitor
 

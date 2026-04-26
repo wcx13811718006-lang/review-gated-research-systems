@@ -296,8 +296,10 @@ class LocalAIRuntimeTests(unittest.TestCase):
         self.assertIn("review_gate", workbench)
         self.assertIn("/api/jobs", workbench)
         self.assertIn("运行并看反馈", workbench)
-        self.assertIn("固定显示当前任务", workbench)
+        self.assertIn("启动任务后，这里会显示任务编号", workbench)
         self.assertIn("liveJobSummary", workbench)
+        self.assertIn("选择文件", workbench)
+        self.assertIn("选择文件夹", workbench)
 
     def test_local_console_jobs_only_build_safe_whitelisted_commands(self) -> None:
         manager = LocalConsoleJobManager(repo_root=PROJECT_ROOT, config={}, config_path=PROJECT_ROOT / "configs" / "local_ai.example.json")
@@ -309,6 +311,28 @@ class LocalAIRuntimeTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             manager._build_job({"action": "rm -rf /"})
+
+    def test_local_console_job_records_prompt_and_source_identity(self) -> None:
+        manager = LocalConsoleJobManager(repo_root=PROJECT_ROOT, config={}, config_path=PROJECT_ROOT / "configs" / "local_ai.example.json")
+        job = manager._build_job({"action": "ask", "prompt": "Read this source.", "source": "README.md"})
+
+        payload = job.to_dict()
+        self.assertEqual(payload["prompt"], "Read this source.")
+        self.assertTrue(payload["source"].endswith("README.md"))
+        self.assertIn("--source", job.argv)
+
+    def test_local_console_folder_source_expands_to_supported_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            folder = Path(tmp_dir)
+            (folder / "a.md").write_text("alpha", encoding="utf-8")
+            (folder / "b.txt").write_text("beta", encoding="utf-8")
+            (folder / ".hidden.md").write_text("hidden", encoding="utf-8")
+            manager = LocalConsoleJobManager(repo_root=PROJECT_ROOT, config={}, config_path=PROJECT_ROOT / "configs" / "local_ai.example.json")
+
+            job = manager._build_job({"action": "ideate", "prompt": "Find ideas.", "source": str(folder)})
+
+            self.assertEqual(job.argv.count("--source"), 2)
+            self.assertIn("2 files selected", job.source)
 
     def test_console_job_result_summary_extracts_review_gate_result(self) -> None:
         job = ConsoleJob(

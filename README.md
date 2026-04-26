@@ -110,7 +110,13 @@ Historical replay comparisons can be run locally against private benchmark CSVs:
 research-ai-replay --csv "/path/to/private/benchmark.csv" --output /tmp/replay_report.json
 ```
 
-See [`docs/local_deployment.md`](./docs/local_deployment.md), [`docs/quality_guardrails.md`](./docs/quality_guardrails.md), [`docs/local_validation_protocol.md`](./docs/local_validation_protocol.md), and [`docs/external_agent_patterns.md`](./docs/external_agent_patterns.md).
+Creative ideation from literature or legal sources is available through:
+
+```bash
+research-ai-local --config local_ai.config.json ideate "Generate research ideas from this literature." --source "/path/to/source.pdf"
+```
+
+See [`docs/local_deployment.md`](./docs/local_deployment.md), [`docs/quality_guardrails.md`](./docs/quality_guardrails.md), [`docs/local_validation_protocol.md`](./docs/local_validation_protocol.md), [`docs/creative_ideation.md`](./docs/creative_ideation.md), [`docs/model_ceiling_strategy.md`](./docs/model_ceiling_strategy.md), and [`docs/external_agent_patterns.md`](./docs/external_agent_patterns.md).
 
 ## Demo Path
 
@@ -194,6 +200,8 @@ It does not claim to replace faculty judgment, archival verification, domain exp
 - [`docs/local_deployment.md`](./docs/local_deployment.md)
 - [`docs/quality_guardrails.md`](./docs/quality_guardrails.md)
 - [`docs/local_validation_protocol.md`](./docs/local_validation_protocol.md)
+- [`docs/creative_ideation.md`](./docs/creative_ideation.md)
+- [`docs/model_ceiling_strategy.md`](./docs/model_ceiling_strategy.md)
 - [`docs/external_agent_patterns.md`](./docs/external_agent_patterns.md)
 - [`diagrams/README.md`](./diagrams/README.md)
 

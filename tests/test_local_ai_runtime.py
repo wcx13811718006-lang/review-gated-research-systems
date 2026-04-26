@@ -12,6 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.research_systems_showcase.local_ai.assistant import run_local_research_prompt
+from src.research_systems_showcase.local_ai.ideation import build_source_profile, run_literature_ideation
 from src.research_systems_showcase.local_ai.quality import evaluate_local_answer
 from src.research_systems_showcase.local_ai.replay import compare_prefixed_columns
 
@@ -161,6 +162,44 @@ class LocalAIRuntimeTests(unittest.TestCase):
                 "FinalDecision",
                 report["review_cost_signal"]["fields_with_empty_candidate_outputs"],
             )
+
+    def test_source_profile_extracts_keywords_for_ideation(self) -> None:
+        profile = build_source_profile(
+            "Climate litigation may affect transition risk through policy uncertainty. "
+            "Litigation records can provide document-level signals for investment research."
+        )
+
+        terms = {item["term"] for item in profile["keyword_candidates"]}
+        self.assertIn("litigation", terms)
+        self.assertGreater(profile["source_context_characters"], 50)
+
+    def test_ideation_dry_run_writes_review_gated_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_dir = Path(tmp_dir)
+            source_path = output_dir / "source.txt"
+            source_path.write_text(
+                "Climate litigation affects investment risk through legal uncertainty, "
+                "reputational channels, and policy implementation pressure.",
+                encoding="utf-8",
+            )
+
+            manifest = run_literature_ideation(
+                focus="Generate research ideas about climate litigation and investment risk.",
+                repo_root=PROJECT_ROOT,
+                config_path=PROJECT_ROOT / "configs" / "local_ai.example.json",
+                source_paths=[source_path],
+                output_dir=output_dir,
+                idea_count=3,
+                dry_run=True,
+            )
+
+            self.assertEqual(manifest["mode"], "literature_ideation")
+            self.assertTrue(manifest["review_required"])
+            self.assertFalse(manifest["can_export_final"])
+            self.assertTrue(Path(manifest["artifacts"]["source_profile"]).exists())
+            self.assertTrue(Path(manifest["artifacts"]["idea_scaffold"]).exists())
+            self.assertTrue(Path(manifest["artifacts"]["idea_brief"]).exists())
+            self.assertTrue(Path(manifest["artifacts"]["review_gate"]).exists())
 
 
 if __name__ == "__main__":

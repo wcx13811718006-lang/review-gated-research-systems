@@ -8,6 +8,7 @@ Last checked: 2026-04-25.
 
 - [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent)
 - [openclaw/openclaw](https://github.com/openclaw/openclaw)
+- [ResearAI/DeepScientist](https://github.com/ResearAI/DeepScientist)
 
 ## Patterns Worth Borrowing
 
@@ -89,6 +90,17 @@ OpenClaw documents that main-session tools may run with host access, while non-m
 - final export remains blocked by validation and review
 - no remote messaging, browser automation, file deletion, or scheduled actions by default
 
+### 6. Findings Memory Without Full Autonomy
+
+DeepScientist emphasizes long-horizon research work, findings memory, experiment logs, and preserving failed branches. For this project, the useful pattern is a smaller local abstraction:
+
+- preserve accepted findings, rejected findings, and failed extraction/model attempts
+- keep failed branches inspectable instead of overwriting them
+- link each idea or coded output back to source excerpts, backend attempts, and review decisions
+- promote only reviewed findings into later benchmark or research-memory use
+
+This repository does not adopt DeepScientist's full autonomous discovery loop. The public-safe version keeps human review and schema validation as the controlling layer.
+
 ## Patterns Not Borrowed Yet
 
 - remote messaging gateways
@@ -97,6 +109,7 @@ OpenClaw documents that main-session tools may run with host access, while non-m
 - self-modifying skills
 - broad filesystem automation
 - cloud agent hosting
+- full autonomous discovery loops
 
 These can be useful later, but only after the local review-gated workflow is reliable on historical data.
 
@@ -107,5 +120,5 @@ These can be useful later, but only after the local review-gated workflow is rel
 3. Structured output skills with schema-locked validation.
 4. Review memory from accepted corrections.
 5. Project status surfaces.
-6. Optional automation with explicit approval and sandboxing.
-
+6. Findings memory for accepted, rejected, and failed branches.
+7. Optional automation with explicit approval and sandboxing.

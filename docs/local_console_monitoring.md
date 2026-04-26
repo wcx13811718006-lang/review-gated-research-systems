@@ -35,6 +35,9 @@ http://127.0.0.1:8765
 
 The console shows:
 
+- a researcher-facing operation guide
+- compact health cards instead of a long raw terminal log
+- copy buttons for safe commands
 - CPU load
 - memory pressure approximation
 - disk space for key paths
@@ -44,6 +47,8 @@ The console shows:
 - configured, discovered, and effective model information
 - safe command examples
 - prompt-compression command examples for lowering draft-generation token cost
+
+The raw diagnostic log is still available under "展开原始诊断日志" for debugging.
 
 ## Terminal Monitor
 

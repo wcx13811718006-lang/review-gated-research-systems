@@ -609,7 +609,28 @@ class ConsoleJob:
             "error": self.error,
             "log_tail": "\n".join(self.log_lines[-120:]),
             "backend_snapshot": self.backend_snapshot,
+            "result_summary": self._result_summary(),
         }
+
+    def _result_summary(self) -> dict[str, Any]:
+        labels = {
+            "Backend": "backend",
+            "Fallback used": "fallback_used",
+            "Decision": "decision",
+            "Review required": "review_required",
+            "Can export final": "can_export_final",
+            "Generation error": "generation_error",
+        }
+        summary: dict[str, Any] = {"artifacts": []}
+        for line in self.log_lines:
+            for label, key in labels.items():
+                prefix = f"{label}:"
+                if line.startswith(prefix):
+                    summary[key] = line.removeprefix(prefix).strip()
+            if line.startswith("  - ") and ":" in line:
+                name, path = line[4:].split(":", 1)
+                summary["artifacts"].append({"name": name.strip(), "path": path.strip()})
+        return summary
 
 
 class LocalConsoleJobManager:
@@ -893,7 +914,7 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
     }}
     .workspace {{
       display: grid;
-      grid-template-rows: auto 1fr auto;
+      grid-template-rows: auto minmax(0, 1fr) minmax(170px, 250px) auto;
       min-width: 0;
       padding: 22px;
       gap: 14px;
@@ -987,12 +1008,40 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       gap: 9px;
       align-content: stretch;
     }}
-    .bubble.feedback {{
-      display: none;
+    .feedback-dock {{
       max-width: 960px;
+      min-height: 0;
+      overflow: hidden;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
       background: #fffdf7;
       color: var(--ink);
-      border-color: var(--line);
+    }}
+    .feedback-dock header {{
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }}
+    .feedback-dock pre {{
+      max-height: 120px;
+      margin: 8px 0 0;
+    }}
+    .result-summary {{
+      display: grid;
+      gap: 6px;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }}
+    .result-summary strong {{
+      color: var(--ink);
+    }}
+    .result-summary code {{
+      margin-top: 4px;
+      white-space: normal;
+      word-break: break-word;
     }}
     .job-meta {{
       display: flex;
@@ -1021,6 +1070,13 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       gap: 4px;
       padding: 10px 0;
       border-top: 1px solid #eadfce;
+      cursor: pointer;
+    }}
+    .job-row.active {{
+      background: #eef5ee;
+      margin: 0 -8px;
+      padding: 10px 8px;
+      border-radius: 12px;
     }}
     .job-row:first-child {{
       border-top: 0;
@@ -1171,11 +1227,19 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
           <strong>怎么开始</strong>
           <p>从左侧选择任务。可以只生成命令，也可以点击“运行并看反馈”让本地白名单任务在后台执行。所有模型结果仍然需要 review gate 和人工判断。</p>
         </div>
-        <div class="bubble feedback" id="liveJob">
+      </section>
+      <section class="feedback-dock" id="liveJob">
+        <header>
           <strong id="liveJobTitle">任务反馈</strong>
-          <div class="job-meta" id="liveJobMeta"></div>
-          <pre id="liveJobLog">等待任务启动。</pre>
+          <span class="muted">固定显示当前任务，不需要翻聊天记录</span>
+        </header>
+        <div class="job-meta" id="liveJobMeta">
+          <span class="job-chip">等待任务</span>
         </div>
+        <div class="result-summary" id="liveJobSummary">
+          运行后这里会显示模型后端、Decision、Review required 和 artifact 路径。
+        </div>
+        <pre id="liveJobLog">等待任务启动。</pre>
       </section>
       <section class="composer">
         <div>
@@ -1270,12 +1334,13 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
     function buildCommand() {{
       const prompt = document.getElementById('researchPrompt').value.trim();
       const source = document.getElementById('sourcePath').value.trim();
+      const defaultSource = source || 'README.md';
       let command = selectedTask.command;
       if (prompt) {{
         command = command.replace(/"Draft a review-gated answer\\."|"Generate research ideas\\."|"review-gated workflow"/, JSON.stringify(prompt));
       }}
-      if (source) {{
-        command = command.replace('README.md', source).replace('/path/to/source.pdf', source);
+      if (selectedTask.action === 'compress' || selectedTask.action === 'ask' || selectedTask.action === 'ideate') {{
+        command = command.replace('README.md', defaultSource).replace('/path/to/source.pdf', defaultSource);
       }}
       return command;
     }}
@@ -1340,9 +1405,13 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       try {{
         const response = await fetch('/api/jobs');
         const payload = await response.json();
-        renderJobs(payload.jobs || []);
+        const jobs = payload.jobs || [];
+        if (!activeJobId && jobs.length > 0) {{
+          activeJobId = jobs[0].job_id;
+        }}
+        renderJobs(jobs);
         if (activeJobId) {{
-          const active = (payload.jobs || []).find((job) => job.job_id === activeJobId);
+          const active = jobs.find((job) => job.job_id === activeJobId);
           if (active) {{
             renderActiveJob(active);
             if (active.status === 'completed' || active.status === 'failed') {{
@@ -1390,7 +1459,7 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       jobList.innerHTML = '';
       jobs.slice(0, 8).forEach((job) => {{
         const row = document.createElement('article');
-        row.className = 'job-row';
+        row.className = 'job-row' + (job.job_id === activeJobId ? ' active' : '');
         const title = document.createElement('strong');
         title.innerHTML = '<span>' + escapeHtml(job.title || job.action || 'job') + '</span><span class="job-chip ' + escapeHtml(job.status || '') + '">' + escapeHtml(job.status || 'unknown') + '</span>';
         const stage = document.createElement('span');
@@ -1412,8 +1481,8 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       const live = document.getElementById('liveJob');
       const title = document.getElementById('liveJobTitle');
       const meta = document.getElementById('liveJobMeta');
+      const summary = document.getElementById('liveJobSummary');
       const log = document.getElementById('liveJobLog');
-      live.style.display = 'block';
       title.textContent = '任务反馈：' + (job.title || job.action || '本地任务');
       meta.innerHTML = '';
       [
@@ -1436,6 +1505,7 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
           meta.appendChild(chip);
         }});
       }}
+      renderResultSummary(summary, job);
       const lines = [];
       lines.push(job.command_display || '');
       if (job.error) {{
@@ -1451,6 +1521,27 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       }}
       log.textContent = lines.join('\\n');
       log.scrollTop = log.scrollHeight;
+    }}
+
+    function renderResultSummary(container, job) {{
+      const result = job.result_summary || {{}};
+      const hasResult = Boolean(result.backend || result.decision || result.review_required || result.can_export_final || result.generation_error || (result.artifacts && result.artifacts.length));
+      if (!hasResult) {{
+        container.innerHTML = '<span><strong>当前阶段：</strong>' + escapeHtml(job.stage || '等待输出') + '</span><span>模型运行中可能几十秒没有新日志；右侧仍会更新 PID 和耗时。</span>';
+        return;
+      }}
+      const parts = [];
+      if (result.backend) parts.push('<span><strong>Backend:</strong> ' + escapeHtml(result.backend) + '</span>');
+      if (result.decision) parts.push('<span><strong>Decision:</strong> ' + escapeHtml(result.decision) + '</span>');
+      if (result.review_required) parts.push('<span><strong>Review required:</strong> ' + escapeHtml(result.review_required) + '</span>');
+      if (result.can_export_final) parts.push('<span><strong>Can export final:</strong> ' + escapeHtml(result.can_export_final) + '</span>');
+      if (result.generation_error) parts.push('<span><strong>Generation error:</strong> ' + escapeHtml(result.generation_error) + '</span>');
+      if (result.artifacts && result.artifacts.length) {{
+        result.artifacts.forEach((artifact) => {{
+          parts.push('<span><strong>' + escapeHtml(artifact.name || 'artifact') + ':</strong><code>' + escapeHtml(artifact.path || '') + '</code></span>');
+        }});
+      }}
+      container.innerHTML = parts.join('');
     }}
 
     function escapeHtml(text) {{

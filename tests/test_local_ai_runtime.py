@@ -14,6 +14,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.research_systems_showcase.local_ai.assistant import run_local_research_prompt
 from src.research_systems_showcase.local_ai.ideation import build_source_profile, run_literature_ideation
 from src.research_systems_showcase.local_ai.local_console import (
+    ConsoleJob,
     LocalConsoleJobManager,
     render_console_html,
     render_workbench_html,
@@ -295,6 +296,8 @@ class LocalAIRuntimeTests(unittest.TestCase):
         self.assertIn("review_gate", workbench)
         self.assertIn("/api/jobs", workbench)
         self.assertIn("运行并看反馈", workbench)
+        self.assertIn("固定显示当前任务", workbench)
+        self.assertIn("liveJobSummary", workbench)
 
     def test_local_console_jobs_only_build_safe_whitelisted_commands(self) -> None:
         manager = LocalConsoleJobManager(repo_root=PROJECT_ROOT, config={}, config_path=PROJECT_ROOT / "configs" / "local_ai.example.json")
@@ -306,6 +309,31 @@ class LocalAIRuntimeTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             manager._build_job({"action": "rm -rf /"})
+
+    def test_console_job_result_summary_extracts_review_gate_result(self) -> None:
+        job = ConsoleJob(
+            job_id="test",
+            action="ask",
+            title="研究问答草稿",
+            command_display="python -m cli ask",
+            argv=["python", "-m", "cli", "ask"],
+            log_lines=[
+                "Local AI run completed.",
+                "Backend: lmstudio",
+                "Fallback used: True",
+                "Decision: needs_human_review",
+                "Review required: True",
+                "Can export final: False",
+                "Artifacts:",
+                "  - review_gate: /tmp/review_gate.json",
+            ],
+        )
+
+        summary = job.to_dict()["result_summary"]
+        self.assertEqual(summary["backend"], "lmstudio")
+        self.assertEqual(summary["decision"], "needs_human_review")
+        self.assertEqual(summary["review_required"], "True")
+        self.assertEqual(summary["artifacts"][0]["name"], "review_gate")
 
     def test_builtin_token_compression_preserves_query_relevant_text(self) -> None:
         text = "\n\n".join(

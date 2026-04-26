@@ -34,6 +34,20 @@ DEFAULT_LOCAL_AI_CONFIG: dict[str, Any] = {
         "minimum_source_context_characters": 200,
         "minimum_answer_characters": 120,
     },
+    "monitor": {
+        "outputs_dir": "outputs/system_monitor",
+        "token_artifact_dir": "outputs/local_ai_runs",
+        "token_recent_run_limit": 20,
+        "disk_paths": [".", "outputs/local_ai_runs", "/tmp"],
+        "high_load_ratio": 0.85,
+        "low_disk_free_fraction": 0.1,
+    },
+    "prompt_compression": {
+        "enabled": False,
+        "method": "auto",
+        "ratio": 0.65,
+        "target_tokens": None,
+    },
 }
 
 

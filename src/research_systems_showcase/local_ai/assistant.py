@@ -19,6 +19,7 @@ from .backends import (
 )
 from .config import load_local_ai_config
 from .quality import evaluate_local_answer
+from .token_compression import maybe_compress_source_context
 
 
 def _utc_stamp() -> str:
@@ -194,6 +195,11 @@ def run_local_research_prompt(
         source_paths or [],
         int(config.get("max_source_characters_per_file", 4000)),
     )
+    source_context, compression_manifest = maybe_compress_source_context(
+        source_context,
+        config,
+        user_prompt,
+    )
     preview_limit = int(config.get("source_context_preview_characters", 1000))
     prompt = _build_prompt(user_prompt, source_context)
     backend_name, backend_status = _select_backend(config)
@@ -261,6 +267,7 @@ def run_local_research_prompt(
             "generation_attempts": generation_attempts,
             "backend_status": backend_status,
             "source_manifest": source_manifest,
+            "prompt_compression": compression_manifest,
             "source_context_characters": len(source_context),
             "source_context_preview": source_context[:preview_limit],
         },

@@ -13,8 +13,15 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.research_systems_showcase.local_ai.assistant import run_local_research_prompt
 from src.research_systems_showcase.local_ai.ideation import build_source_profile, run_literature_ideation
+from src.research_systems_showcase.local_ai.local_console import render_console_html
 from src.research_systems_showcase.local_ai.quality import evaluate_local_answer
 from src.research_systems_showcase.local_ai.replay import compare_prefixed_columns
+from src.research_systems_showcase.local_ai.system_monitor import (
+    build_model_routing_advice,
+    collect_token_snapshot,
+    estimate_tokens,
+)
+from src.research_systems_showcase.local_ai.token_compression import compress_text
 
 
 class LocalAIRuntimeTests(unittest.TestCase):
@@ -200,6 +207,142 @@ class LocalAIRuntimeTests(unittest.TestCase):
             self.assertTrue(Path(manifest["artifacts"]["idea_scaffold"]).exists())
             self.assertTrue(Path(manifest["artifacts"]["idea_brief"]).exists())
             self.assertTrue(Path(manifest["artifacts"]["review_gate"]).exists())
+
+    def test_token_snapshot_estimates_local_artifact_usage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            run_dir = root / "outputs" / "local_ai_runs" / "local_ai_1"
+            run_dir.mkdir(parents=True)
+            (run_dir / "request.json").write_text(
+                '{"run_id":"local_ai_1","prompt":"short prompt","source_context_characters":400}',
+                encoding="utf-8",
+            )
+            (run_dir / "draft_response.md").write_text("draft answer " * 20, encoding="utf-8")
+
+            snapshot = collect_token_snapshot(
+                root,
+                {
+                    "outputs_dir": "outputs/local_ai_runs",
+                    "monitor": {"token_artifact_dir": "outputs/local_ai_runs"},
+                },
+            )
+
+            self.assertEqual(snapshot["runs_counted"], 1)
+            self.assertGreaterEqual(snapshot["estimated_source_tokens"], 100)
+            self.assertGreater(snapshot["estimated_output_tokens"], 0)
+
+    def test_model_routing_advice_preserves_review_gate_policy(self) -> None:
+        advice = build_model_routing_advice(
+            {
+                "ollama": {
+                    "reachable": False,
+                    "configured_model": "qwen2.5:7b",
+                    "effective_model": "",
+                    "available_models": [],
+                    "status_label": "unreachable",
+                },
+                "lmstudio": {
+                    "reachable": True,
+                    "configured_model": "",
+                    "effective_model": "qwen/qwen3.5-9b",
+                    "available_models": ["qwen/qwen3.5-9b"],
+                    "status_label": "reachable",
+                },
+            },
+            {
+                "primary_backend": "ollama",
+                "review_backend": "lmstudio",
+                "fallback_to_review_backend": True,
+            },
+        )
+
+        self.assertIn("fallback", " ".join(advice["advisories"]).casefold())
+        self.assertIn("does not bypass", advice["policy"])
+
+    def test_local_console_html_is_status_only(self) -> None:
+        html = render_console_html(
+            {
+                "created_at": "2026-01-01T00:00:00Z",
+                "summary": {"status": "ok", "advisories": []},
+                "cpu": {"load_average": {"1m": 0.1}, "cpu_count": 8, "load_ratio_1m": 0.012},
+                "memory": {"available_gb": 8.0},
+                "thermal": {"thermal_pressure": "nominal"},
+                "token_usage": {"estimated_total_tokens": estimate_tokens("hello"), "runs_counted": 1},
+                "backends": {},
+                "disk": [],
+                "model_routing": {
+                    "primary_backend": "ollama",
+                    "review_backend": "lmstudio",
+                    "fallback_to_review_backend": True,
+                    "candidates": [],
+                    "advisories": ["Configured model path is available."],
+                    "policy": "Model switching changes draft-generation behavior only.",
+                },
+            }
+        )
+
+        self.assertIn("Local Research AI Console", html)
+        self.assertIn("no auto-finalization", html)
+        self.assertIn("/api/monitor", html)
+
+    def test_builtin_token_compression_preserves_query_relevant_text(self) -> None:
+        text = "\n\n".join(
+            [
+                "General background paragraph with limited relevance.",
+                "Climate litigation case documents identify Plaintiff and Defendant fields.",
+                "The addressed issue and final decision fields must remain reviewable.",
+                "Administrative filler text that should be less important.",
+            ]
+        )
+
+        result = compress_text(
+            text,
+            query="climate litigation plaintiff defendant final decision",
+            target_tokens=35,
+            method="builtin",
+        )
+
+        compressed = result["compressed_text"]
+        self.assertEqual(result["method"], "builtin_extractive")
+        self.assertTrue(result["lossy"])
+        self.assertIn("Plaintiff", compressed)
+        self.assertLessEqual(result["compressed_tokens"], result["origin_tokens"])
+
+    def test_compression_metadata_is_written_to_local_ai_request(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_dir = Path(tmp_dir) / "out"
+            source_path = Path(tmp_dir) / "source.txt"
+            source_path.write_text(
+                "Climate litigation Plaintiff Defendant FinalDecision Addressed Issue. " * 20,
+                encoding="utf-8",
+            )
+            config_path = Path(tmp_dir) / "config.json"
+            config_path.write_text(
+                """
+                {
+                  "prompt_compression": {
+                    "enabled": true,
+                    "method": "builtin",
+                    "target_tokens": 60
+                  }
+                }
+                """,
+                encoding="utf-8",
+            )
+
+            manifest = run_local_research_prompt(
+                user_prompt="Draft a review-gated legal coding note.",
+                repo_root=PROJECT_ROOT,
+                config_path=config_path,
+                source_paths=[source_path],
+                output_dir=output_dir,
+                dry_run=True,
+            )
+            request_text = Path(manifest["artifacts"]["request"]).read_text(encoding="utf-8")
+
+            self.assertIn('"enabled": true', request_text)
+            self.assertIn('"method": "builtin_extractive"', request_text)
+            self.assertIn('"lossy": true', request_text)
 
 
 if __name__ == "__main__":

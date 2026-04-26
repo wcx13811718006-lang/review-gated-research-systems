@@ -9,6 +9,7 @@ Last checked: 2026-04-25.
 - [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent)
 - [openclaw/openclaw](https://github.com/openclaw/openclaw)
 - [ResearAI/DeepScientist](https://github.com/ResearAI/DeepScientist)
+- [Google Research AI co-scientist](https://research.google/blog/accelerating-scientific-breakthroughs-with-an-ai-co-scientist)
 
 ## Patterns Worth Borrowing
 
@@ -101,6 +102,18 @@ DeepScientist emphasizes long-horizon research work, findings memory, experiment
 
 This repository does not adopt DeepScientist's full autonomous discovery loop. The public-safe version keeps human review and schema validation as the controlling layer.
 
+### 7. Scientific-Method-Inspired Agent Roles
+
+Google's AI co-scientist describes a multi-agent research assistant organized around generation, reflection, ranking, evolution, proximity, and meta-review. The useful local pattern is to separate research work into visible roles:
+
+- generate candidate ideas or coded drafts
+- reflect on source support and missing evidence
+- rank candidates by review readiness
+- preserve alternate branches instead of overwriting them
+- meta-review whether a result is ready for human inspection
+
+This repository should not claim autonomous scientific discovery. It can borrow the role separation while keeping each stage inspectable and review-gated.
+
 ## Patterns Not Borrowed Yet
 
 - remote messaging gateways
@@ -110,6 +123,7 @@ This repository does not adopt DeepScientist's full autonomous discovery loop. T
 - broad filesystem automation
 - cloud agent hosting
 - full autonomous discovery loops
+- opaque multi-agent self-improvement
 
 These can be useful later, but only after the local review-gated workflow is reliable on historical data.
 
@@ -121,4 +135,5 @@ These can be useful later, but only after the local review-gated workflow is rel
 4. Review memory from accepted corrections.
 5. Project status surfaces.
 6. Findings memory for accepted, rejected, and failed branches.
-7. Optional automation with explicit approval and sandboxing.
+7. Research-role separation: generation, reflection, ranking, and meta-review.
+8. Optional automation with explicit approval and sandboxing.

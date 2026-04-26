@@ -101,6 +101,9 @@ source .venv/bin/activate
 python3 -m pip install -e .
 cp configs/local_ai.example.json local_ai.config.json
 research-ai-local --config local_ai.config.json status
+research-ai-local --config local_ai.config.json monitor
+research-ai-local --config local_ai.config.json console
+research-ai-local --config local_ai.config.json compress --source README.md --query "review-gated research workflow"
 research-ai-local --config local_ai.config.json ask "Summarize this repository for a research collaborator." --source README.md
 ```
 
@@ -116,7 +119,9 @@ Creative ideation from literature or legal sources is available through:
 research-ai-local --config local_ai.config.json ideate "Generate research ideas from this literature." --source "/path/to/source.pdf"
 ```
 
-See [`docs/local_deployment.md`](./docs/local_deployment.md), [`docs/quality_guardrails.md`](./docs/quality_guardrails.md), [`docs/local_validation_protocol.md`](./docs/local_validation_protocol.md), [`docs/creative_ideation.md`](./docs/creative_ideation.md), [`docs/model_ceiling_strategy.md`](./docs/model_ceiling_strategy.md), and [`docs/external_agent_patterns.md`](./docs/external_agent_patterns.md).
+The local operations console runs at `http://127.0.0.1:8765` and shows system load, token estimates, model routing, and safe commands without auto-finalizing outputs.
+
+See [`docs/local_deployment.md`](./docs/local_deployment.md), [`docs/quality_guardrails.md`](./docs/quality_guardrails.md), [`docs/local_validation_protocol.md`](./docs/local_validation_protocol.md), [`docs/local_console_monitoring.md`](./docs/local_console_monitoring.md), [`docs/token_cost_control.md`](./docs/token_cost_control.md), [`docs/creative_ideation.md`](./docs/creative_ideation.md), [`docs/model_ceiling_strategy.md`](./docs/model_ceiling_strategy.md), and [`docs/external_agent_patterns.md`](./docs/external_agent_patterns.md).
 
 ## Demo Path
 
@@ -200,6 +205,8 @@ It does not claim to replace faculty judgment, archival verification, domain exp
 - [`docs/local_deployment.md`](./docs/local_deployment.md)
 - [`docs/quality_guardrails.md`](./docs/quality_guardrails.md)
 - [`docs/local_validation_protocol.md`](./docs/local_validation_protocol.md)
+- [`docs/local_console_monitoring.md`](./docs/local_console_monitoring.md)
+- [`docs/token_cost_control.md`](./docs/token_cost_control.md)
 - [`docs/creative_ideation.md`](./docs/creative_ideation.md)
 - [`docs/model_ceiling_strategy.md`](./docs/model_ceiling_strategy.md)
 - [`docs/external_agent_patterns.md`](./docs/external_agent_patterns.md)

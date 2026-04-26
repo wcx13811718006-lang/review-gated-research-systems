@@ -32,6 +32,11 @@ classifiers = [
 research-ai-local = "research_systems_showcase.local_ai.cli:main"
 research-ai-replay = "research_systems_showcase.local_ai.replay:main"
 
+[project.optional-dependencies]
+token-compression = [
+  "llmlingua>=0.2.2"
+]
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 

@@ -14,6 +14,7 @@ from .assistant import (
 )
 from .config import load_local_ai_config
 from .quality import evaluate_local_answer
+from .token_compression import maybe_compress_source_context
 
 
 STOPWORDS = {
@@ -251,6 +252,11 @@ def run_literature_ideation(
         source_paths or [],
         int(config.get("max_source_characters_per_file", 4000)),
     )
+    source_context, compression_manifest = maybe_compress_source_context(
+        source_context,
+        config,
+        focus,
+    )
     preview_limit = int(config.get("source_context_preview_characters", 1000))
     source_profile = build_source_profile(source_context)
     theory_scaffold = _render_theory_scaffold(focus, source_profile, idea_count)
@@ -331,6 +337,7 @@ def run_literature_ideation(
             "generation_attempts": generation_attempts,
             "backend_status": backend_status,
             "source_manifest": source_manifest,
+            "prompt_compression": compression_manifest,
             "source_context_characters": len(source_context),
             "source_context_preview": source_context[:preview_limit],
         },

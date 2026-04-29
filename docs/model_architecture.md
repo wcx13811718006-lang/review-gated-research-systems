@@ -33,6 +33,27 @@ research-ai-local --config local_ai.config.json architecture
 
 It is also available from the local console through the `模型架构` command.
 
+## Run Memory
+
+The next layer is a read-only run-memory summary. It scans stored artifacts and reports:
+
+- recent run IDs
+- prompt or focus text
+- backend and effective model
+- fallback use
+- review-gate decision
+- failed checks
+- generation failures
+- artifact paths
+
+Run it from the terminal:
+
+```bash
+research-ai-local --config local_ai.config.json memory
+```
+
+This does not approve, revise, export, or delete anything. It turns failed and review-gated runs into inspectable operational memory.
+
 ## Safety Boundaries
 
 - Model output remains draft-only until review.

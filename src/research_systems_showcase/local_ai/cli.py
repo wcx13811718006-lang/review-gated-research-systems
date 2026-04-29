@@ -10,6 +10,7 @@ from .config import load_local_ai_config
 from .ideation import run_literature_ideation
 from .local_console import run_local_console
 from .model_architecture import build_model_execution_plan, render_model_architecture_summary
+from .run_memory import collect_run_memory, render_run_memory_summary, write_run_memory_snapshot
 from .system_monitor import (
     build_model_routing_advice,
     collect_monitor_snapshot,
@@ -44,6 +45,15 @@ def parse_args() -> argparse.Namespace:
     architecture.add_argument("--task-type", default="research_draft", help="Task label to include in the plan.")
     architecture.add_argument("--source-count", type=int, default=0, help="Number of explicit source files.")
     architecture.add_argument("--json", action="store_true", help="Print the architecture plan as JSON.")
+
+    memory = subparsers.add_parser(
+        "memory",
+        help="Summarize recent local AI run artifacts without approving or exporting outputs.",
+    )
+    memory.add_argument("--limit", type=int, default=20, help="Number of recent run directories to inspect.")
+    memory.add_argument("--json", action="store_true", help="Print the run memory snapshot as JSON.")
+    memory.add_argument("--write", action="store_true", help="Write the run memory snapshot to outputs/system_monitor.")
+    memory.add_argument("--output-dir", type=Path, default=None, help="Optional output directory for memory JSON.")
 
     monitor = subparsers.add_parser("monitor", help="Show local system, model, and token-usage status.")
     monitor.add_argument("--json", action="store_true", help="Print the full monitor snapshot as JSON.")
@@ -109,6 +119,18 @@ def main() -> None:
             print(json.dumps(plan, ensure_ascii=False, indent=2))
         else:
             print(render_model_architecture_summary(plan))
+        return
+    if args.command == "memory":
+        memory = collect_run_memory(repo_root, config, limit=args.limit)
+        if args.write:
+            output_path = write_run_memory_snapshot(memory, repo_root, config, args.output_dir)
+            memory["written_to"] = str(output_path)
+        if args.json:
+            print(json.dumps(memory, ensure_ascii=False, indent=2))
+        else:
+            print(render_run_memory_summary(memory))
+            if args.write:
+                print(f"\nSnapshot written to: {memory['written_to']}")
         return
     if args.command == "monitor":
         snapshot = collect_monitor_snapshot(repo_root, config)

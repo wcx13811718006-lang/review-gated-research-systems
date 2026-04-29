@@ -40,6 +40,7 @@ The console is now organized as a compact researcher workbench:
 - right inspector for computer status, model status, and recent review-gated runs
 - copy buttons for safe commands generated from the selected task
 - a "模型架构" command that explains the current backend roles, fallback policy, and review-gated stages
+- a "运行记忆" command that summarizes recent run artifacts, review queue, failed checks, and fallback usage
 - a "运行并看反馈" path for running only whitelisted local actions from the browser
 - a task progress panel with status, stage, process ID, elapsed time, and live stdout/stderr tail
 - visible task numbers, job IDs, prompt text, and selected source paths so the current task is identifiable
@@ -68,7 +69,7 @@ The raw diagnostic log is still available under "原始诊断" for debugging, bu
 
 The console still does not auto-finalize, auto-export, or silently clear review gates.
 
-The browser runner is intentionally narrow. It only starts the local actions already exposed by this repository: monitor, models, architecture, compress, ask, and ideate. It does not execute arbitrary shell commands.
+The browser runner is intentionally narrow. It only starts the local actions already exposed by this repository: monitor, models, architecture, memory, compress, ask, and ideate. It does not execute arbitrary shell commands.
 
 Folder selection is conservative. For ask and ideate tasks, the console expands a selected folder into supported source files up to a small limit. Compression remains single-file only.
 
@@ -117,6 +118,14 @@ research-ai-local --config local_ai.config.json architecture
 ```
 
 This prints the local execution stages: source intake, draft generation, review/fallback backend check, quality gate, artifact memory, and human review.
+
+Show recent run memory:
+
+```bash
+research-ai-local --config local_ai.config.json memory
+```
+
+This scans stored local run artifacts and reports recent runs, review-required counts, fallback use, generation failures, failed checks, and artifact paths. It is read-only and does not approve or export outputs.
 
 ## Token Accounting
 

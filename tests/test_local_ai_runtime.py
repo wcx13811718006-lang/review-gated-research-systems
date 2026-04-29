@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 import unittest
@@ -25,6 +26,7 @@ from src.research_systems_showcase.local_ai.model_architecture import (
 )
 from src.research_systems_showcase.local_ai.quality import evaluate_local_answer
 from src.research_systems_showcase.local_ai.replay import compare_prefixed_columns
+from src.research_systems_showcase.local_ai.run_memory import collect_run_memory, render_run_memory_summary
 from src.research_systems_showcase.local_ai.system_monitor import (
     build_model_routing_advice,
     collect_token_snapshot,
@@ -305,6 +307,7 @@ class LocalAIRuntimeTests(unittest.TestCase):
         self.assertIn("选择文件", workbench)
         self.assertIn("选择文件夹", workbench)
         self.assertIn("模型架构", workbench)
+        self.assertIn("运行记忆", workbench)
 
     def test_local_console_jobs_only_build_safe_whitelisted_commands(self) -> None:
         manager = LocalConsoleJobManager(repo_root=PROJECT_ROOT, config={}, config_path=PROJECT_ROOT / "configs" / "local_ai.example.json")
@@ -320,6 +323,10 @@ class LocalAIRuntimeTests(unittest.TestCase):
         architecture_job = manager._build_job({"action": "architecture"})
         self.assertIn("architecture", architecture_job.argv)
         self.assertEqual(architecture_job.title, "模型架构")
+
+        memory_job = manager._build_job({"action": "memory"})
+        self.assertIn("memory", memory_job.argv)
+        self.assertEqual(memory_job.title, "运行记忆")
 
     def test_local_console_job_records_prompt_and_source_identity(self) -> None:
         manager = LocalConsoleJobManager(repo_root=PROJECT_ROOT, config={}, config_path=PROJECT_ROOT / "configs" / "local_ai.example.json")
@@ -464,6 +471,68 @@ class LocalAIRuntimeTests(unittest.TestCase):
         summary = render_model_architecture_summary(plan)
         self.assertIn("Review-Gated Model Architecture", summary)
         self.assertIn("Human review required by policy: True", summary)
+
+    def test_run_memory_summarizes_review_gated_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            run_dir = root / "outputs" / "local_ai_runs" / "local_ai_1"
+            run_dir.mkdir(parents=True)
+            (run_dir / "request.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "local_ai_1",
+                        "created_at": "2026-01-01T00:00:00Z",
+                        "prompt": "Review this source.",
+                        "backend": "lmstudio",
+                        "fallback_used": True,
+                        "generation_attempts": [
+                            {"backend": "ollama", "ok": False, "error": "runner crashed"},
+                            {"backend": "lmstudio", "ok": True, "fallback": True},
+                        ],
+                        "backend_status": {"effective_model": "qwen/qwen3.5-9b"},
+                        "source_manifest": [{"path": "README.md", "included": True}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (run_dir / "review_gate.json").write_text(
+                json.dumps(
+                    {
+                        "decision": "needs_human_review",
+                        "review_required": True,
+                        "can_export_final": False,
+                        "failed_checks": ["final_answer_present"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (run_dir / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "local_ai_1",
+                        "backend": "lmstudio",
+                        "fallback_used": True,
+                        "decision": "needs_human_review",
+                        "review_required": True,
+                        "can_export_final": False,
+                        "artifacts": {"review_gate": str(run_dir / "review_gate.json")},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            memory = collect_run_memory(root, {"outputs_dir": "outputs/local_ai_runs"}, limit=10)
+
+            self.assertEqual(memory["runs_counted"], 1)
+            self.assertEqual(memory["counts"]["review_required"], 1)
+            self.assertEqual(memory["counts"]["fallback_used"], 1)
+            self.assertIn("final_answer_present", memory["counts"]["failed_checks"])
+            self.assertEqual(memory["review_queue"][0]["run_id"], "local_ai_1")
+            self.assertIn("runner crashed", memory["recent_runs"][0]["generation_error"])
+
+            summary = render_run_memory_summary(memory)
+            self.assertIn("Local Run Memory", summary)
+            self.assertIn("review_required=True", summary)
 
 
 if __name__ == "__main__":

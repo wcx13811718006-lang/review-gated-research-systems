@@ -9,6 +9,7 @@ from .backends import collect_backend_statuses
 from .config import load_local_ai_config
 from .ideation import run_literature_ideation
 from .local_console import run_local_console
+from .model_architecture import build_model_execution_plan, render_model_architecture_summary
 from .system_monitor import (
     build_model_routing_advice,
     collect_monitor_snapshot,
@@ -35,6 +36,14 @@ def parse_args() -> argparse.Namespace:
 
     subparsers.add_parser("status", help="Check local Ollama and LM Studio availability.")
     subparsers.add_parser("models", help="Show configured, available, and effective local models.")
+
+    architecture = subparsers.add_parser(
+        "architecture",
+        help="Show the conservative model-routing and review-gate architecture plan.",
+    )
+    architecture.add_argument("--task-type", default="research_draft", help="Task label to include in the plan.")
+    architecture.add_argument("--source-count", type=int, default=0, help="Number of explicit source files.")
+    architecture.add_argument("--json", action="store_true", help="Print the architecture plan as JSON.")
 
     monitor = subparsers.add_parser("monitor", help="Show local system, model, and token-usage status.")
     monitor.add_argument("--json", action="store_true", help="Print the full monitor snapshot as JSON.")
@@ -87,6 +96,19 @@ def main() -> None:
     if args.command == "models":
         statuses = collect_backend_statuses(config)
         print(render_model_summary(build_model_routing_advice(statuses, config)))
+        return
+    if args.command == "architecture":
+        statuses = collect_backend_statuses(config)
+        plan = build_model_execution_plan(
+            config,
+            task_type=args.task_type,
+            source_count=args.source_count,
+            statuses=statuses,
+        )
+        if args.json:
+            print(json.dumps(plan, ensure_ascii=False, indent=2))
+        else:
+            print(render_model_architecture_summary(plan))
         return
     if args.command == "monitor":
         snapshot = collect_monitor_snapshot(repo_root, config)

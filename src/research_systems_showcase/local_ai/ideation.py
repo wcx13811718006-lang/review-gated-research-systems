@@ -13,6 +13,7 @@ from .assistant import (
     _utc_stamp,
 )
 from .config import load_local_ai_config
+from .model_architecture import build_model_execution_plan
 from .quality import evaluate_local_answer
 from .token_compression import maybe_compress_source_context
 
@@ -336,6 +337,12 @@ def run_literature_ideation(
             "fallback_used": fallback_used,
             "generation_attempts": generation_attempts,
             "backend_status": backend_status,
+            "model_architecture": build_model_execution_plan(
+                config,
+                task_type="literature_ideation",
+                source_count=len(source_paths or []),
+                statuses={backend_name: backend_status},
+            ),
             "source_manifest": source_manifest,
             "prompt_compression": compression_manifest,
             "source_context_characters": len(source_context),

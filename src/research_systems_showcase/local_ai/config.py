@@ -34,6 +34,17 @@ DEFAULT_LOCAL_AI_CONFIG: dict[str, Any] = {
         "minimum_source_context_characters": 200,
         "minimum_answer_characters": 120,
     },
+    "model_architecture": {
+        "mode": "review_gated_local",
+        "allow_auto_finalize": False,
+        "borrowed_patterns": [
+            "stateful_workflow",
+            "role_separated_generation_review",
+            "durable_artifact_memory",
+            "failed_branch_preservation",
+            "local_observability",
+        ],
+    },
     "monitor": {
         "outputs_dir": "outputs/system_monitor",
         "token_artifact_dir": "outputs/local_ai_runs",

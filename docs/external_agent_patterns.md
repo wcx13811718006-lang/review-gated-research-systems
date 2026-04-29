@@ -2,13 +2,17 @@
 
 This project can learn from current open-source agent systems without copying their stacks wholesale. The goal is to borrow patterns that strengthen local research work, review gates, traceability, and validation.
 
-Last checked: 2026-04-25.
+Last checked: 2026-04-29.
 
 ## References
 
 - [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent)
 - [openclaw/openclaw](https://github.com/openclaw/openclaw)
 - [ResearAI/DeepScientist](https://github.com/ResearAI/DeepScientist)
+- [langchain-ai/langgraph](https://github.com/langchain-ai/langgraph)
+- [microsoft/autogen](https://github.com/microsoft/autogen)
+- [OpenHands/OpenHands](https://github.com/OpenHands/OpenHands)
+- [CrewAI open source](https://www.crewai.com/open-source)
 - [Google Research AI co-scientist](https://research.google/blog/accelerating-scientific-breakthroughs-with-an-ai-co-scientist)
 
 ## Patterns Worth Borrowing
@@ -113,6 +117,30 @@ Google's AI co-scientist describes a multi-agent research assistant organized ar
 - meta-review whether a result is ready for human inspection
 
 This repository should not claim autonomous scientific discovery. It can borrow the role separation while keeping each stage inspectable and review-gated.
+
+### 8. Durable State Instead Of Hidden Chains
+
+LangGraph's useful pattern is not a dependency requirement. The pattern is that long-running work should have explicit state transitions, durable checkpoints, and human inspection points. In this repository, the local equivalent is:
+
+- source intake
+- draft generation
+- review/fallback backend check
+- deterministic quality gate
+- artifact memory
+- human review
+
+The new local model-architecture planner exposes these stages in the CLI and console without replacing the existing workflow.
+
+### 9. Observable Execution Rather Than Broad Autonomy
+
+OpenHands and similar coding agents make execution state visible through logs, process status, and artifacts. The useful pattern here is narrow observability:
+
+- show which backend and model were selected
+- show which task is running
+- preserve stdout/stderr tails
+- keep request and review-gate artifacts inspectable
+
+The public showcase does not adopt broad autonomous filesystem or application control.
 
 ## Patterns Not Borrowed Yet
 

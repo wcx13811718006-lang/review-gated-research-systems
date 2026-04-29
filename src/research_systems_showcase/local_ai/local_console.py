@@ -49,6 +49,12 @@ def _command_cards() -> list[dict[str, str]]:
             "command": "research-ai-local --config local_ai.config.json models",
         },
         {
+            "title": "模型架构",
+            "action": "architecture",
+            "when": "查看当前本地模型分工、fallback、review gate 和人审边界。",
+            "command": "research-ai-local --config local_ai.config.json architecture",
+        },
+        {
             "title": "压缩材料",
             "action": "compress",
             "when": "长文献先压缩，降低草稿生成 token 成本。压缩结果仍需复核。",
@@ -641,7 +647,7 @@ class ConsoleJob:
 
 
 class LocalConsoleJobManager:
-    allowed_actions = {"monitor", "models", "compress", "ask", "ideate"}
+    allowed_actions = {"monitor", "models", "architecture", "compress", "ask", "ideate"}
     folder_source_limit = 20
     folder_source_suffixes = {
         ".txt",
@@ -705,6 +711,9 @@ class LocalConsoleJobManager:
         elif action == "models":
             title = "查看模型"
             argv.append("models")
+        elif action == "architecture":
+            title = "模型架构"
+            argv.append("architecture")
         elif action == "compress":
             title = "压缩材料"
             source_path = self._resolve_source_path(source or "README.md")
@@ -856,6 +865,8 @@ class LocalConsoleJobManager:
             stage = "monitor snapshot ready"
         elif "model routing status" in normalized:
             stage = "model routing checked"
+        elif "review-gated model architecture" in normalized:
+            stage = "model architecture ready"
         if stage:
             with self.lock:
                 self.jobs[job_id].stage = stage
@@ -1432,7 +1443,7 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
   <div class="toast" id="toast">已复制</div>
   <script>
     const TASKS = {command_json};
-    let selectedTask = TASKS[3];
+    let selectedTask = TASKS.find((task) => task.action === 'ask') || TASKS[0];
     let activeJobId = null;
 
     function renderNav() {{

@@ -122,7 +122,7 @@ research-ai-local --config local_ai.config.json ideate "Generate research ideas 
 The local operations console runs at `http://127.0.0.1:8765` and shows system load, token estimates, model routing, and safe commands without auto-finalizing outputs.
 On macOS, double-click [`start_local_ai_console.command`](./start_local_ai_console.command) to start the console directly.
 
-See [`docs/local_deployment.md`](./docs/local_deployment.md), [`docs/quality_guardrails.md`](./docs/quality_guardrails.md), [`docs/local_validation_protocol.md`](./docs/local_validation_protocol.md), [`docs/local_console_monitoring.md`](./docs/local_console_monitoring.md), [`docs/token_cost_control.md`](./docs/token_cost_control.md), [`docs/creative_ideation.md`](./docs/creative_ideation.md), [`docs/model_ceiling_strategy.md`](./docs/model_ceiling_strategy.md), and [`docs/external_agent_patterns.md`](./docs/external_agent_patterns.md).
+See [`docs/local_deployment.md`](./docs/local_deployment.md), [`docs/quality_guardrails.md`](./docs/quality_guardrails.md), [`docs/local_validation_protocol.md`](./docs/local_validation_protocol.md), [`docs/local_console_monitoring.md`](./docs/local_console_monitoring.md), [`docs/token_cost_control.md`](./docs/token_cost_control.md), [`docs/creative_ideation.md`](./docs/creative_ideation.md), [`docs/model_architecture.md`](./docs/model_architecture.md), [`docs/model_ceiling_strategy.md`](./docs/model_ceiling_strategy.md), and [`docs/external_agent_patterns.md`](./docs/external_agent_patterns.md).
 
 ## Demo Path
 
@@ -209,6 +209,7 @@ It does not claim to replace faculty judgment, archival verification, domain exp
 - [`docs/local_console_monitoring.md`](./docs/local_console_monitoring.md)
 - [`docs/token_cost_control.md`](./docs/token_cost_control.md)
 - [`docs/creative_ideation.md`](./docs/creative_ideation.md)
+- [`docs/model_architecture.md`](./docs/model_architecture.md)
 - [`docs/model_ceiling_strategy.md`](./docs/model_ceiling_strategy.md)
 - [`docs/external_agent_patterns.md`](./docs/external_agent_patterns.md)
 - [`diagrams/README.md`](./diagrams/README.md)

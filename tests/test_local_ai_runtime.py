@@ -19,6 +19,10 @@ from src.research_systems_showcase.local_ai.local_console import (
     render_console_html,
     render_workbench_html,
 )
+from src.research_systems_showcase.local_ai.model_architecture import (
+    build_model_execution_plan,
+    render_model_architecture_summary,
+)
 from src.research_systems_showcase.local_ai.quality import evaluate_local_answer
 from src.research_systems_showcase.local_ai.replay import compare_prefixed_columns
 from src.research_systems_showcase.local_ai.system_monitor import (
@@ -300,6 +304,7 @@ class LocalAIRuntimeTests(unittest.TestCase):
         self.assertIn("liveJobSummary", workbench)
         self.assertIn("选择文件", workbench)
         self.assertIn("选择文件夹", workbench)
+        self.assertIn("模型架构", workbench)
 
     def test_local_console_jobs_only_build_safe_whitelisted_commands(self) -> None:
         manager = LocalConsoleJobManager(repo_root=PROJECT_ROOT, config={}, config_path=PROJECT_ROOT / "configs" / "local_ai.example.json")
@@ -311,6 +316,10 @@ class LocalAIRuntimeTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             manager._build_job({"action": "rm -rf /"})
+
+        architecture_job = manager._build_job({"action": "architecture"})
+        self.assertIn("architecture", architecture_job.argv)
+        self.assertEqual(architecture_job.title, "模型架构")
 
     def test_local_console_job_records_prompt_and_source_identity(self) -> None:
         manager = LocalConsoleJobManager(repo_root=PROJECT_ROOT, config={}, config_path=PROJECT_ROOT / "configs" / "local_ai.example.json")
@@ -417,6 +426,44 @@ class LocalAIRuntimeTests(unittest.TestCase):
             self.assertIn('"enabled": true', request_text)
             self.assertIn('"method": "builtin_extractive"', request_text)
             self.assertIn('"lossy": true', request_text)
+
+    def test_model_architecture_plan_preserves_review_gates(self) -> None:
+        plan = build_model_execution_plan(
+            {
+                "primary_backend": "ollama",
+                "review_backend": "lmstudio",
+                "fallback_to_review_backend": True,
+                "quality_gate": {
+                    "allow_final_without_review": False,
+                    "require_human_review": True,
+                },
+            },
+            task_type="literature_ideation",
+            source_count=2,
+            statuses={
+                "ollama": {
+                    "configured_model": "qwen2.5:7b",
+                    "effective_model": "qwen2.5:7b",
+                    "available_models": ["qwen2.5:7b"],
+                    "status_label": "reachable",
+                },
+                "lmstudio": {
+                    "configured_model": "",
+                    "effective_model": "qwen/qwen3.5-9b",
+                    "available_models": ["qwen/qwen3.5-9b"],
+                    "status_label": "reachable",
+                },
+            },
+        )
+
+        self.assertEqual(plan["task_type"], "literature_ideation")
+        self.assertFalse(plan["auto_finalize_enabled"])
+        self.assertTrue(plan["review_required_by_policy"])
+        self.assertIn("quality_gate", [stage["stage_id"] for stage in plan["stages"]])
+
+        summary = render_model_architecture_summary(plan)
+        self.assertIn("Review-Gated Model Architecture", summary)
+        self.assertIn("Human review required by policy: True", summary)
 
 
 if __name__ == "__main__":

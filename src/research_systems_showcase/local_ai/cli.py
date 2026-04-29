@@ -7,6 +7,7 @@ from pathlib import Path
 from .assistant import run_local_research_prompt
 from .backends import collect_backend_statuses
 from .config import load_local_ai_config
+from .data_acquisition import acquire_data_sources, render_data_acquisition_summary
 from .ideation import run_literature_ideation
 from .local_console import run_local_console
 from .model_architecture import build_model_execution_plan, render_model_architecture_summary
@@ -54,6 +55,18 @@ def parse_args() -> argparse.Namespace:
     memory.add_argument("--json", action="store_true", help="Print the run memory snapshot as JSON.")
     memory.add_argument("--write", action="store_true", help="Write the run memory snapshot to outputs/system_monitor.")
     memory.add_argument("--output-dir", type=Path, default=None, help="Optional output directory for memory JSON.")
+
+    acquire = subparsers.add_parser(
+        "acquire",
+        help="Fetch user-supplied URLs or local files into traceable local intake artifacts.",
+    )
+    acquire.add_argument("--url", action="append", default=[], help="Explicit URL to acquire. Repeatable.")
+    acquire.add_argument("--url-file", type=Path, default=None, help="Text file containing one URL per line.")
+    acquire.add_argument("--local-source", type=Path, action="append", default=[], help="Local file to copy into intake.")
+    acquire.add_argument("--output-dir", type=Path, default=None, help="Optional output directory for data intake.")
+    acquire.add_argument("--max-bytes", type=int, default=None, help="Maximum bytes per source.")
+    acquire.add_argument("--dry-run", action="store_true", help="Plan intake without downloading or copying sources.")
+    acquire.add_argument("--json", action="store_true", help="Print the intake manifest as JSON.")
 
     monitor = subparsers.add_parser("monitor", help="Show local system, model, and token-usage status.")
     monitor.add_argument("--json", action="store_true", help="Print the full monitor snapshot as JSON.")
@@ -131,6 +144,22 @@ def main() -> None:
             print(render_run_memory_summary(memory))
             if args.write:
                 print(f"\nSnapshot written to: {memory['written_to']}")
+        return
+    if args.command == "acquire":
+        manifest = acquire_data_sources(
+            repo_root=repo_root,
+            config=config,
+            urls=args.url,
+            url_file=args.url_file,
+            local_sources=args.local_source,
+            output_dir=args.output_dir,
+            max_bytes=args.max_bytes,
+            dry_run=args.dry_run,
+        )
+        if args.json:
+            print(json.dumps(manifest, ensure_ascii=False, indent=2))
+        else:
+            print(render_data_acquisition_summary(manifest))
         return
     if args.command == "monitor":
         snapshot = collect_monitor_snapshot(repo_root, config)

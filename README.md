@@ -127,7 +127,13 @@ Recent local runs can be inspected without approving or exporting them:
 research-ai-local --config local_ai.config.json memory
 ```
 
-See [`docs/local_deployment.md`](./docs/local_deployment.md), [`docs/quality_guardrails.md`](./docs/quality_guardrails.md), [`docs/local_validation_protocol.md`](./docs/local_validation_protocol.md), [`docs/local_console_monitoring.md`](./docs/local_console_monitoring.md), [`docs/token_cost_control.md`](./docs/token_cost_control.md), [`docs/creative_ideation.md`](./docs/creative_ideation.md), [`docs/model_architecture.md`](./docs/model_architecture.md), [`docs/model_ceiling_strategy.md`](./docs/model_ceiling_strategy.md), and [`docs/external_agent_patterns.md`](./docs/external_agent_patterns.md).
+Explicit URLs or local files can be pulled into traceable intake artifacts before review-gated processing:
+
+```bash
+research-ai-local --config local_ai.config.json acquire --local-source README.md
+```
+
+See [`docs/local_deployment.md`](./docs/local_deployment.md), [`docs/quality_guardrails.md`](./docs/quality_guardrails.md), [`docs/local_validation_protocol.md`](./docs/local_validation_protocol.md), [`docs/local_console_monitoring.md`](./docs/local_console_monitoring.md), [`docs/data_acquisition.md`](./docs/data_acquisition.md), [`docs/token_cost_control.md`](./docs/token_cost_control.md), [`docs/creative_ideation.md`](./docs/creative_ideation.md), [`docs/model_architecture.md`](./docs/model_architecture.md), [`docs/model_ceiling_strategy.md`](./docs/model_ceiling_strategy.md), and [`docs/external_agent_patterns.md`](./docs/external_agent_patterns.md).
 
 ## Demo Path
 
@@ -212,6 +218,7 @@ It does not claim to replace faculty judgment, archival verification, domain exp
 - [`docs/quality_guardrails.md`](./docs/quality_guardrails.md)
 - [`docs/local_validation_protocol.md`](./docs/local_validation_protocol.md)
 - [`docs/local_console_monitoring.md`](./docs/local_console_monitoring.md)
+- [`docs/data_acquisition.md`](./docs/data_acquisition.md)
 - [`docs/token_cost_control.md`](./docs/token_cost_control.md)
 - [`docs/creative_ideation.md`](./docs/creative_ideation.md)
 - [`docs/model_architecture.md`](./docs/model_architecture.md)

@@ -54,5 +54,11 @@
     "method": "auto",
     "ratio": 0.65,
     "target_tokens": null
+  },
+  "data_acquisition": {
+    "outputs_dir": "outputs/data_intake",
+    "max_bytes_per_source": 10000000,
+    "timeout_seconds": 30,
+    "extracted_text_char_limit": 200000
   }
 }

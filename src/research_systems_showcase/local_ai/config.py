@@ -59,6 +59,12 @@ DEFAULT_LOCAL_AI_CONFIG: dict[str, Any] = {
         "ratio": 0.65,
         "target_tokens": None,
     },
+    "data_acquisition": {
+        "outputs_dir": "outputs/data_intake",
+        "max_bytes_per_source": 10_000_000,
+        "timeout_seconds": 30,
+        "extracted_text_char_limit": 200_000,
+    },
 }
 
 

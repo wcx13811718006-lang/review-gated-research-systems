@@ -61,6 +61,12 @@ def _command_cards() -> list[dict[str, str]]:
             "command": "research-ai-local --config local_ai.config.json memory",
         },
         {
+            "title": "采集数据",
+            "action": "acquire",
+            "when": "抓取用户明确给出的 URL 或复制本地文件，写入可追踪 intake artifacts。",
+            "command": "research-ai-local --config local_ai.config.json acquire --url https://example.com/data.csv",
+        },
+        {
             "title": "压缩材料",
             "action": "compress",
             "when": "长文献先压缩，降低草稿生成 token 成本。压缩结果仍需复核。",
@@ -639,6 +645,13 @@ class ConsoleJob:
             "Review required": "review_required",
             "Can export final": "can_export_final",
             "Generation error": "generation_error",
+            "Run directory": "run_directory",
+            "Manifest": "manifest",
+            "Acquired": "acquired",
+            "Text extracted": "text_extracted",
+            "Failed": "failed",
+            "Skipped": "skipped",
+            "Dry run": "dry_run",
         }
         summary: dict[str, Any] = {"artifacts": []}
         for line in self.log_lines:
@@ -653,7 +666,7 @@ class ConsoleJob:
 
 
 class LocalConsoleJobManager:
-    allowed_actions = {"monitor", "models", "architecture", "memory", "compress", "ask", "ideate"}
+    allowed_actions = {"monitor", "models", "architecture", "memory", "acquire", "compress", "ask", "ideate"}
     folder_source_limit = 20
     folder_source_suffixes = {
         ".txt",
@@ -723,6 +736,18 @@ class LocalConsoleJobManager:
         elif action == "memory":
             title = "运行记忆"
             argv.append("memory")
+        elif action == "acquire":
+            title = "采集数据"
+            candidate = source or prompt or "README.md"
+            prompt_display = prompt
+            source_display = candidate
+            argv.append("acquire")
+            if candidate.startswith(("http://", "https://")):
+                argv.extend(["--url", candidate])
+            else:
+                source_path = self._resolve_source_path(candidate)
+                source_display = str(source_path)
+                argv.extend(["--local-source", str(source_path)])
         elif action == "compress":
             title = "压缩材料"
             source_path = self._resolve_source_path(source or "README.md")
@@ -878,6 +903,8 @@ class LocalConsoleJobManager:
             stage = "model architecture ready"
         elif "local run memory" in normalized:
             stage = "run memory ready"
+        elif "local data acquisition" in normalized:
+            stage = "data intake ready"
         if stage:
             with self.lock:
                 self.jobs[job_id].stage = stage
@@ -1505,6 +1532,14 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       if (selectedTask.action === 'compress' || selectedTask.action === 'ask' || selectedTask.action === 'ideate') {{
         command = command.replace('README.md', defaultSource).replace('/path/to/source.pdf', defaultSource);
       }}
+      if (selectedTask.action === 'acquire') {{
+        const candidate = source || prompt || 'README.md';
+        if (candidate.startsWith('http://') || candidate.startsWith('https://')) {{
+          command = 'research-ai-local --config local_ai.config.json acquire --url ' + JSON.stringify(candidate);
+        }} else {{
+          command = 'research-ai-local --config local_ai.config.json acquire --local-source ' + JSON.stringify(candidate);
+        }}
+      }}
       return command;
     }}
 
@@ -1744,7 +1779,7 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
 
     function renderResultSummary(container, job) {{
       const result = job.result_summary || {{}};
-      const hasResult = Boolean(result.backend || result.decision || result.review_required || result.can_export_final || result.generation_error || (result.artifacts && result.artifacts.length));
+      const hasResult = Boolean(result.backend || result.decision || result.review_required || result.can_export_final || result.generation_error || result.run_directory || result.manifest || result.acquired || (result.artifacts && result.artifacts.length));
       if (!hasResult) {{
         container.innerHTML = '<span><strong>当前阶段：</strong>' + escapeHtml(job.stage || '等待输出') + '</span><span>模型运行中可能几十秒没有新日志；右侧仍会更新 PID 和耗时。</span>';
         return;
@@ -1755,6 +1790,11 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       if (result.review_required) parts.push('<span><strong>Review required:</strong> ' + escapeHtml(result.review_required) + '</span>');
       if (result.can_export_final) parts.push('<span><strong>Can export final:</strong> ' + escapeHtml(result.can_export_final) + '</span>');
       if (result.generation_error) parts.push('<span><strong>Generation error:</strong> ' + escapeHtml(result.generation_error) + '</span>');
+      if (result.run_directory) parts.push('<span><strong>Run directory:</strong><code>' + escapeHtml(result.run_directory) + '</code></span>');
+      if (result.manifest) parts.push('<span><strong>Manifest:</strong><code>' + escapeHtml(result.manifest) + '</code></span>');
+      ['acquired', 'text_extracted', 'failed', 'skipped', 'dry_run'].forEach((key) => {{
+        if (result[key]) parts.push('<span><strong>' + escapeHtml(key) + ':</strong> ' + escapeHtml(result[key]) + '</span>');
+      }});
       if (result.artifacts && result.artifacts.length) {{
         result.artifacts.forEach((artifact) => {{
           parts.push('<span><strong>' + escapeHtml(artifact.name || 'artifact') + ':</strong><code>' + escapeHtml(artifact.path || '') + '</code></span>');

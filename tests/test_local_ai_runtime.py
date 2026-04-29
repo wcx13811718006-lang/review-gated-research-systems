@@ -13,6 +13,10 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.research_systems_showcase.local_ai.assistant import run_local_research_prompt
+from src.research_systems_showcase.local_ai.data_acquisition import (
+    acquire_data_sources,
+    render_data_acquisition_summary,
+)
 from src.research_systems_showcase.local_ai.ideation import build_source_profile, run_literature_ideation
 from src.research_systems_showcase.local_ai.local_console import (
     ConsoleJob,
@@ -308,6 +312,7 @@ class LocalAIRuntimeTests(unittest.TestCase):
         self.assertIn("选择文件夹", workbench)
         self.assertIn("模型架构", workbench)
         self.assertIn("运行记忆", workbench)
+        self.assertIn("采集数据", workbench)
 
     def test_local_console_jobs_only_build_safe_whitelisted_commands(self) -> None:
         manager = LocalConsoleJobManager(repo_root=PROJECT_ROOT, config={}, config_path=PROJECT_ROOT / "configs" / "local_ai.example.json")
@@ -327,6 +332,11 @@ class LocalAIRuntimeTests(unittest.TestCase):
         memory_job = manager._build_job({"action": "memory"})
         self.assertIn("memory", memory_job.argv)
         self.assertEqual(memory_job.title, "运行记忆")
+
+        acquire_job = manager._build_job({"action": "acquire", "source": "README.md"})
+        self.assertIn("acquire", acquire_job.argv)
+        self.assertIn("--local-source", acquire_job.argv)
+        self.assertEqual(acquire_job.title, "采集数据")
 
     def test_local_console_job_records_prompt_and_source_identity(self) -> None:
         manager = LocalConsoleJobManager(repo_root=PROJECT_ROOT, config={}, config_path=PROJECT_ROOT / "configs" / "local_ai.example.json")
@@ -533,6 +543,50 @@ class LocalAIRuntimeTests(unittest.TestCase):
             summary = render_run_memory_summary(memory)
             self.assertIn("Local Run Memory", summary)
             self.assertIn("review_required=True", summary)
+
+    def test_data_acquisition_copies_local_file_with_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "source.txt"
+            source.write_text("Traceable local source text for acquisition.", encoding="utf-8")
+
+            manifest = acquire_data_sources(
+                repo_root=root,
+                config={"data_acquisition": {"outputs_dir": "outputs/data_intake"}},
+                local_sources=[source],
+            )
+
+            self.assertEqual(manifest["counts"]["requested"], 1)
+            self.assertEqual(manifest["counts"]["acquired"], 1)
+            self.assertEqual(manifest["counts"]["text_extracted"], 1)
+            self.assertTrue(Path(manifest["manifest_path"]).exists())
+
+            record = manifest["records"][0]
+            self.assertEqual(record["status"], "acquired")
+            self.assertTrue(Path(record["raw_path"]).exists())
+            self.assertTrue(Path(record["extracted_text_path"]).exists())
+            self.assertTrue(record["sha256"])
+
+            summary = render_data_acquisition_summary(manifest)
+            self.assertIn("Local Data Acquisition", summary)
+            self.assertIn("Acquired: 1", summary)
+
+    def test_data_acquisition_dry_run_does_not_copy_local_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "source.txt"
+            source.write_text("Do not copy in dry run.", encoding="utf-8")
+
+            manifest = acquire_data_sources(
+                repo_root=root,
+                config={"data_acquisition": {"outputs_dir": "outputs/data_intake"}},
+                local_sources=[source],
+                dry_run=True,
+            )
+
+            self.assertEqual(manifest["counts"]["dry_run"], 1)
+            self.assertEqual(manifest["records"][0]["status"], "dry_run")
+            self.assertFalse(manifest["records"][0]["raw_path"])
 
 
 if __name__ == "__main__":

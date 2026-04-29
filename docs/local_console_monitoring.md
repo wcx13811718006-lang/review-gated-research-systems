@@ -41,6 +41,7 @@ The console is now organized as a compact researcher workbench:
 - copy buttons for safe commands generated from the selected task
 - a "模型架构" command that explains the current backend roles, fallback policy, and review-gated stages
 - a "运行记忆" command that summarizes recent run artifacts, review queue, failed checks, and fallback usage
+- a "采集数据" command that fetches explicit URLs or copies local files into traceable intake artifacts
 - a "运行并看反馈" path for running only whitelisted local actions from the browser
 - a task progress panel with status, stage, process ID, elapsed time, and live stdout/stderr tail
 - visible task numbers, job IDs, prompt text, and selected source paths so the current task is identifiable
@@ -69,7 +70,7 @@ The raw diagnostic log is still available under "原始诊断" for debugging, bu
 
 The console still does not auto-finalize, auto-export, or silently clear review gates.
 
-The browser runner is intentionally narrow. It only starts the local actions already exposed by this repository: monitor, models, architecture, memory, compress, ask, and ideate. It does not execute arbitrary shell commands.
+The browser runner is intentionally narrow. It only starts the local actions already exposed by this repository: monitor, models, architecture, memory, acquire, compress, ask, and ideate. It does not execute arbitrary shell commands.
 
 Folder selection is conservative. For ask and ideate tasks, the console expands a selected folder into supported source files up to a small limit. Compression remains single-file only.
 
@@ -126,6 +127,20 @@ research-ai-local --config local_ai.config.json memory
 ```
 
 This scans stored local run artifacts and reports recent runs, review-required counts, fallback use, generation failures, failed checks, and artifact paths. It is read-only and does not approve or export outputs.
+
+Acquire a user-supplied source:
+
+```bash
+research-ai-local --config local_ai.config.json acquire --url "https://example.com/data.csv"
+```
+
+or:
+
+```bash
+research-ai-local --config local_ai.config.json acquire --local-source README.md
+```
+
+This writes `outputs/data_intake/.../intake_manifest.json`, raw artifacts, and extracted text when possible. It does not crawl recursively or validate research claims.
 
 ## Token Accounting
 

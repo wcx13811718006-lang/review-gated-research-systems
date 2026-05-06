@@ -60,5 +60,8 @@
     "max_bytes_per_source": 10000000,
     "timeout_seconds": 30,
     "extracted_text_char_limit": 200000
+  },
+  "review_memory": {
+    "dir": "outputs/review_memory"
   }
 }

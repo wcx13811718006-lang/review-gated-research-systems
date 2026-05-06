@@ -133,7 +133,15 @@ Explicit URLs or local files can be pulled into traceable intake artifacts befor
 research-ai-local --config local_ai.config.json acquire --local-source README.md
 ```
 
-See [`docs/local_deployment.md`](./docs/local_deployment.md), [`docs/quality_guardrails.md`](./docs/quality_guardrails.md), [`docs/local_validation_protocol.md`](./docs/local_validation_protocol.md), [`docs/local_console_monitoring.md`](./docs/local_console_monitoring.md), [`docs/data_acquisition.md`](./docs/data_acquisition.md), [`docs/token_cost_control.md`](./docs/token_cost_control.md), [`docs/creative_ideation.md`](./docs/creative_ideation.md), [`docs/model_architecture.md`](./docs/model_architecture.md), [`docs/model_ceiling_strategy.md`](./docs/model_ceiling_strategy.md), and [`docs/external_agent_patterns.md`](./docs/external_agent_patterns.md).
+Stage-gated templates and audit commands support broader social-science materials:
+
+```bash
+research-ai-local --config local_ai.config.json workflow --template paper
+research-ai-local --config local_ai.config.json audit --template paper
+research-ai-local --config local_ai.config.json review-memory
+```
+
+See [`docs/local_deployment.md`](./docs/local_deployment.md), [`docs/quality_guardrails.md`](./docs/quality_guardrails.md), [`docs/local_validation_protocol.md`](./docs/local_validation_protocol.md), [`docs/local_console_monitoring.md`](./docs/local_console_monitoring.md), [`docs/data_acquisition.md`](./docs/data_acquisition.md), [`docs/social_science_workflows.md`](./docs/social_science_workflows.md), [`docs/token_cost_control.md`](./docs/token_cost_control.md), [`docs/creative_ideation.md`](./docs/creative_ideation.md), [`docs/model_architecture.md`](./docs/model_architecture.md), [`docs/model_ceiling_strategy.md`](./docs/model_ceiling_strategy.md), and [`docs/external_agent_patterns.md`](./docs/external_agent_patterns.md).
 
 ## Demo Path
 
@@ -206,6 +214,8 @@ It does not claim to replace faculty judgment, archival verification, domain exp
 - broader evaluation cases for ambiguous records
 - additional domain-specific validators
 - richer status surfaces for batch monitoring
+- social-science workflow templates tied to reviewed examples
+- retrieval from local review-memory correction logs
 
 ## Further Reading
 
@@ -219,6 +229,7 @@ It does not claim to replace faculty judgment, archival verification, domain exp
 - [`docs/local_validation_protocol.md`](./docs/local_validation_protocol.md)
 - [`docs/local_console_monitoring.md`](./docs/local_console_monitoring.md)
 - [`docs/data_acquisition.md`](./docs/data_acquisition.md)
+- [`docs/social_science_workflows.md`](./docs/social_science_workflows.md)
 - [`docs/token_cost_control.md`](./docs/token_cost_control.md)
 - [`docs/creative_ideation.md`](./docs/creative_ideation.md)
 - [`docs/model_architecture.md`](./docs/model_architecture.md)

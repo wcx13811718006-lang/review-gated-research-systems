@@ -11,6 +11,12 @@ from .data_acquisition import acquire_data_sources, render_data_acquisition_summ
 from .ideation import run_literature_ideation
 from .local_console import run_local_console
 from .model_architecture import build_model_execution_plan, render_model_architecture_summary
+from .review_memory import (
+    append_review_memory,
+    collect_review_memory,
+    render_review_memory_summary,
+    write_review_memory_summary,
+)
 from .run_memory import collect_run_memory, render_run_memory_summary, write_run_memory_snapshot
 from .system_monitor import (
     build_model_routing_advice,
@@ -20,6 +26,13 @@ from .system_monitor import (
     write_monitor_snapshot,
 )
 from .token_compression import compress_file_action
+from .verification_audit import build_verification_audit, render_verification_audit_summary, write_verification_audit
+from .workflow_templates import (
+    build_stage_gated_workflow,
+    list_workflow_templates,
+    render_workflow_summary,
+    write_workflow_artifacts,
+)
 
 
 def _repo_root() -> Path:
@@ -67,6 +80,44 @@ def parse_args() -> argparse.Namespace:
     acquire.add_argument("--max-bytes", type=int, default=None, help="Maximum bytes per source.")
     acquire.add_argument("--dry-run", action="store_true", help="Plan intake without downloading or copying sources.")
     acquire.add_argument("--json", action="store_true", help="Print the intake manifest as JSON.")
+
+    workflow = subparsers.add_parser(
+        "workflow",
+        help="Show or write a stage-gated workflow template for a social-science material type.",
+    )
+    workflow.add_argument("--template", default="paper", help="Template id: paper, policy, legal, interview, or web.")
+    workflow.add_argument("--project-name", default="", help="Optional project label.")
+    workflow.add_argument("--list", action="store_true", help="List available workflow templates.")
+    workflow.add_argument("--write", action="store_true", help="Write workflow JSON and Markdown artifacts.")
+    workflow.add_argument("--output-dir", type=Path, default=None, help="Optional output directory.")
+    workflow.add_argument("--json", action="store_true", help="Print workflow as JSON.")
+
+    audit = subparsers.add_parser(
+        "audit",
+        help="Run a deterministic verification audit over recent local run artifacts.",
+    )
+    audit.add_argument("--template", default="", help="Optional workflow template id for high-stakes field context.")
+    audit.add_argument("--limit", type=int, default=50, help="Number of recent runs to audit.")
+    audit.add_argument("--write", action="store_true", help="Write audit JSON and Markdown artifacts.")
+    audit.add_argument("--output-dir", type=Path, default=None, help="Optional output directory.")
+    audit.add_argument("--json", action="store_true", help="Print audit as JSON.")
+
+    review_memory = subparsers.add_parser(
+        "review-memory",
+        help="Append or summarize local human review-memory records.",
+    )
+    review_memory.add_argument("--add", action="store_true", help="Append a human review-memory record.")
+    review_memory.add_argument("--run-id", default="", help="Run ID the record refers to.")
+    review_memory.add_argument("--field", default="", help="Field or concept being corrected.")
+    review_memory.add_argument("--decision", default="", help="Human decision, e.g. approve, revise, reject.")
+    review_memory.add_argument("--correction", default="", help="Corrected value or short note.")
+    review_memory.add_argument("--rationale", default="", help="Reason for the correction or decision.")
+    review_memory.add_argument("--reviewer", default="", help="Optional reviewer label.")
+    review_memory.add_argument("--source-path", default="", help="Optional source or artifact path.")
+    review_memory.add_argument("--limit", type=int, default=20, help="Recent records to summarize.")
+    review_memory.add_argument("--write", action="store_true", help="Write review-memory summary artifacts.")
+    review_memory.add_argument("--output-dir", type=Path, default=None, help="Optional output directory.")
+    review_memory.add_argument("--json", action="store_true", help="Print JSON.")
 
     monitor = subparsers.add_parser("monitor", help="Show local system, model, and token-usage status.")
     monitor.add_argument("--json", action="store_true", help="Print the full monitor snapshot as JSON.")
@@ -160,6 +211,84 @@ def main() -> None:
             print(json.dumps(manifest, ensure_ascii=False, indent=2))
         else:
             print(render_data_acquisition_summary(manifest))
+        return
+    if args.command == "workflow":
+        if args.list:
+            templates = {"templates": list_workflow_templates()}
+            if args.json:
+                print(json.dumps(templates, ensure_ascii=False, indent=2))
+            else:
+                print("Available Workflow Templates\n")
+                for item in templates["templates"]:
+                    print(f"- {item['template_id']}: {item['label']} ({item['field_count']} fields)")
+            return
+        workflow = build_stage_gated_workflow(args.template, project_name=args.project_name)
+        if args.write:
+            workflow["artifacts"] = write_workflow_artifacts(workflow, repo_root, args.output_dir)
+        if args.json:
+            print(json.dumps(workflow, ensure_ascii=False, indent=2))
+        else:
+            print(render_workflow_summary(workflow))
+            if args.write:
+                print("\nArtifacts:")
+                for name, path in workflow["artifacts"].items():
+                    print(f"  - {name}: {path}")
+        return
+    if args.command == "audit":
+        audit = build_verification_audit(
+            repo_root=repo_root,
+            config=config,
+            template_id=args.template or None,
+            limit=args.limit,
+        )
+        if args.write:
+            audit["artifacts"] = write_verification_audit(audit, repo_root, args.output_dir)
+        if args.json:
+            print(json.dumps(audit, ensure_ascii=False, indent=2))
+        else:
+            print(render_verification_audit_summary(audit))
+            if args.write:
+                print("\nArtifacts:")
+                for name, path in audit["artifacts"].items():
+                    print(f"  - {name}: {path}")
+        return
+    if args.command == "review-memory":
+        if args.add:
+            record = append_review_memory(
+                repo_root=repo_root,
+                config=config,
+                run_id=args.run_id,
+                field=args.field,
+                decision=args.decision,
+                correction=args.correction,
+                rationale=args.rationale,
+                reviewer=args.reviewer,
+                source_path=args.source_path,
+            )
+            if args.json:
+                print(json.dumps(record, ensure_ascii=False, indent=2))
+            else:
+                print("Review memory record added.")
+                print(f"Run ID: {record['run_id']}")
+                print(f"Field: {record['field']}")
+                print(f"Decision: {record['decision']}")
+            return
+        memory_summary = collect_review_memory(repo_root, config, limit=args.limit)
+        if args.write:
+            memory_summary["artifacts"] = write_review_memory_summary(
+                memory_summary,
+                repo_root,
+                config,
+                args.output_dir,
+            )
+        if args.json:
+            print(json.dumps(memory_summary, ensure_ascii=False, indent=2))
+        else:
+            print(render_review_memory_summary(memory_summary))
+            if args.write:
+                print("\nArtifacts:")
+                for name, path in memory_summary["artifacts"].items():
+                    print(f"  - {name}: {path}")
         return
     if args.command == "monitor":
         snapshot = collect_monitor_snapshot(repo_root, config)

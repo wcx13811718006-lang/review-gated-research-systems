@@ -30,6 +30,11 @@ from src.research_systems_showcase.local_ai.model_architecture import (
 )
 from src.research_systems_showcase.local_ai.quality import evaluate_local_answer
 from src.research_systems_showcase.local_ai.replay import compare_prefixed_columns
+from src.research_systems_showcase.local_ai.review_memory import (
+    append_review_memory,
+    collect_review_memory,
+    render_review_memory_summary,
+)
 from src.research_systems_showcase.local_ai.run_memory import collect_run_memory, render_run_memory_summary
 from src.research_systems_showcase.local_ai.system_monitor import (
     build_model_routing_advice,
@@ -37,6 +42,15 @@ from src.research_systems_showcase.local_ai.system_monitor import (
     estimate_tokens,
 )
 from src.research_systems_showcase.local_ai.token_compression import compress_text
+from src.research_systems_showcase.local_ai.verification_audit import (
+    build_verification_audit,
+    render_verification_audit_summary,
+)
+from src.research_systems_showcase.local_ai.workflow_templates import (
+    build_stage_gated_workflow,
+    list_workflow_templates,
+    render_workflow_summary,
+)
 
 
 class LocalAIRuntimeTests(unittest.TestCase):
@@ -313,6 +327,9 @@ class LocalAIRuntimeTests(unittest.TestCase):
         self.assertIn("模型架构", workbench)
         self.assertIn("运行记忆", workbench)
         self.assertIn("采集数据", workbench)
+        self.assertIn("研究流程模板", workbench)
+        self.assertIn("验证审计", workbench)
+        self.assertIn("审阅记忆", workbench)
 
     def test_local_console_jobs_only_build_safe_whitelisted_commands(self) -> None:
         manager = LocalConsoleJobManager(repo_root=PROJECT_ROOT, config={}, config_path=PROJECT_ROOT / "configs" / "local_ai.example.json")
@@ -337,6 +354,20 @@ class LocalAIRuntimeTests(unittest.TestCase):
         self.assertIn("acquire", acquire_job.argv)
         self.assertIn("--local-source", acquire_job.argv)
         self.assertEqual(acquire_job.title, "采集数据")
+
+        workflow_job = manager._build_job({"action": "workflow", "prompt": "paper"})
+        self.assertIn("workflow", workflow_job.argv)
+        self.assertIn("--template", workflow_job.argv)
+        self.assertEqual(workflow_job.title, "研究流程模板")
+
+        audit_job = manager._build_job({"action": "audit", "prompt": "paper"})
+        self.assertIn("audit", audit_job.argv)
+        self.assertIn("--template", audit_job.argv)
+        self.assertEqual(audit_job.title, "验证审计")
+
+        review_memory_job = manager._build_job({"action": "review-memory"})
+        self.assertIn("review-memory", review_memory_job.argv)
+        self.assertEqual(review_memory_job.title, "审阅记忆")
 
     def test_local_console_job_records_prompt_and_source_identity(self) -> None:
         manager = LocalConsoleJobManager(repo_root=PROJECT_ROOT, config={}, config_path=PROJECT_ROOT / "configs" / "local_ai.example.json")
@@ -587,6 +618,91 @@ class LocalAIRuntimeTests(unittest.TestCase):
             self.assertEqual(manifest["counts"]["dry_run"], 1)
             self.assertEqual(manifest["records"][0]["status"], "dry_run")
             self.assertFalse(manifest["records"][0]["raw_path"])
+
+    def test_workflow_template_builds_stage_gated_paper_workflow(self) -> None:
+        templates = list_workflow_templates()
+        self.assertTrue(any(item["template_id"] == "paper" for item in templates))
+
+        workflow = build_stage_gated_workflow("paper", project_name="pilot")
+
+        self.assertEqual(workflow["template_id"], "paper")
+        self.assertIn("identification_strategy", workflow["fields"])
+        self.assertIn("human_review", [stage["stage_id"] for stage in workflow["stages"]])
+
+        summary = render_workflow_summary(workflow)
+        self.assertIn("Stage-Gated Research Workflow", summary)
+        self.assertIn("no auto", summary.casefold())
+
+    def test_verification_audit_escalates_failed_generation_runs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            run_dir = root / "outputs" / "local_ai_runs" / "local_ai_1"
+            run_dir.mkdir(parents=True)
+            (run_dir / "request.json").write_text(
+                json.dumps(
+                    {
+                        "run_id": "local_ai_1",
+                        "prompt": "Read this paper.",
+                        "backend": "lmstudio",
+                        "fallback_used": True,
+                        "generation_attempts": [{"backend": "ollama", "ok": False, "error": "runner crashed"}],
+                        "source_manifest": [{"path": "paper.txt", "included": True}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (run_dir / "review_gate.json").write_text(
+                json.dumps(
+                    {
+                        "decision": "needs_human_review",
+                        "review_required": True,
+                        "can_export_final": False,
+                        "failed_checks": ["final_answer_present"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (run_dir / "manifest.json").write_text(
+                json.dumps({"run_id": "local_ai_1", "backend": "lmstudio", "fallback_used": True}),
+                encoding="utf-8",
+            )
+
+            audit = build_verification_audit(root, {"outputs_dir": "outputs/local_ai_runs"}, template_id="paper")
+
+            self.assertEqual(audit["runs_audited"], 1)
+            self.assertEqual(audit["audited_runs"][0]["risk_level"], "high")
+            self.assertEqual(audit["audited_runs"][0]["escalation"], "repair_or_rerun_before_review")
+            self.assertIn("generation_error_present", audit["counts"]["flags"])
+
+            summary = render_verification_audit_summary(audit)
+            self.assertIn("Verification Audit", summary)
+            self.assertIn("repair", summary)
+
+    def test_review_memory_appends_and_summarizes_human_corrections(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            config = {"review_memory": {"dir": "outputs/review_memory"}}
+
+            record = append_review_memory(
+                repo_root=root,
+                config=config,
+                run_id="local_ai_1",
+                field="identification_strategy",
+                decision="revise",
+                correction="The design is descriptive, not causal.",
+                rationale="No comparison group or timing design was shown.",
+                reviewer="tester",
+            )
+            memory = collect_review_memory(root, config)
+
+            self.assertEqual(record["decision"], "revise")
+            self.assertEqual(memory["records_total"], 1)
+            self.assertIn("identification_strategy", memory["counts"]["fields"])
+            self.assertIn("revise", memory["counts"]["decisions"])
+
+            summary = render_review_memory_summary(memory)
+            self.assertIn("Local Review Memory", summary)
+            self.assertIn("descriptive", summary)
 
 
 if __name__ == "__main__":

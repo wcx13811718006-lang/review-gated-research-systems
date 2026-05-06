@@ -67,6 +67,24 @@ def _command_cards() -> list[dict[str, str]]:
             "command": "research-ai-local --config local_ai.config.json acquire --url https://example.com/data.csv",
         },
         {
+            "title": "研究流程模板",
+            "action": "workflow",
+            "when": "为论文、政策、法律、访谈或网页材料生成 stage-gated 字段和审阅流程。",
+            "command": "research-ai-local --config local_ai.config.json workflow --template paper",
+        },
+        {
+            "title": "验证审计",
+            "action": "audit",
+            "when": "批量检查最近输出的失败模式、风险等级和需要 human review 的原因。",
+            "command": "research-ai-local --config local_ai.config.json audit --template paper",
+        },
+        {
+            "title": "审阅记忆",
+            "action": "review-memory",
+            "when": "查看本地人工修正、代码本决策和 recurring error memory。",
+            "command": "research-ai-local --config local_ai.config.json review-memory",
+        },
+        {
             "title": "压缩材料",
             "action": "compress",
             "when": "长文献先压缩，降低草稿生成 token 成本。压缩结果仍需复核。",
@@ -652,6 +670,8 @@ class ConsoleJob:
             "Failed": "failed",
             "Skipped": "skipped",
             "Dry run": "dry_run",
+            "Runs audited": "runs_audited",
+            "Records total": "records_total",
         }
         summary: dict[str, Any] = {"artifacts": []}
         for line in self.log_lines:
@@ -666,7 +686,19 @@ class ConsoleJob:
 
 
 class LocalConsoleJobManager:
-    allowed_actions = {"monitor", "models", "architecture", "memory", "acquire", "compress", "ask", "ideate"}
+    allowed_actions = {
+        "monitor",
+        "models",
+        "architecture",
+        "memory",
+        "acquire",
+        "workflow",
+        "audit",
+        "review-memory",
+        "compress",
+        "ask",
+        "ideate",
+    }
     folder_source_limit = 20
     folder_source_suffixes = {
         ".txt",
@@ -748,6 +780,19 @@ class LocalConsoleJobManager:
                 source_path = self._resolve_source_path(candidate)
                 source_display = str(source_path)
                 argv.extend(["--local-source", str(source_path)])
+        elif action == "workflow":
+            title = "研究流程模板"
+            template = (prompt or source or "paper").strip().split()[0]
+            prompt_display = template
+            argv.extend(["workflow", "--template", template])
+        elif action == "audit":
+            title = "验证审计"
+            template = (prompt or source or "paper").strip().split()[0]
+            prompt_display = template
+            argv.extend(["audit", "--template", template])
+        elif action == "review-memory":
+            title = "审阅记忆"
+            argv.append("review-memory")
         elif action == "compress":
             title = "压缩材料"
             source_path = self._resolve_source_path(source or "README.md")
@@ -905,6 +950,12 @@ class LocalConsoleJobManager:
             stage = "run memory ready"
         elif "local data acquisition" in normalized:
             stage = "data intake ready"
+        elif "stage-gated research workflow" in normalized:
+            stage = "workflow template ready"
+        elif "verification audit" in normalized:
+            stage = "verification audit ready"
+        elif "local review memory" in normalized:
+            stage = "review memory ready"
         if stage:
             with self.lock:
                 self.jobs[job_id].stage = stage
@@ -1539,6 +1590,17 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
         }} else {{
           command = 'research-ai-local --config local_ai.config.json acquire --local-source ' + JSON.stringify(candidate);
         }}
+      }}
+      if (selectedTask.action === 'workflow') {{
+        const template = (prompt || source || 'paper').trim().split(/\\s+/)[0];
+        command = 'research-ai-local --config local_ai.config.json workflow --template ' + JSON.stringify(template);
+      }}
+      if (selectedTask.action === 'audit') {{
+        const template = (prompt || source || 'paper').trim().split(/\\s+/)[0];
+        command = 'research-ai-local --config local_ai.config.json audit --template ' + JSON.stringify(template);
+      }}
+      if (selectedTask.action === 'review-memory') {{
+        command = 'research-ai-local --config local_ai.config.json review-memory';
       }}
       return command;
     }}

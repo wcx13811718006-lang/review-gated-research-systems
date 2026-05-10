@@ -11,6 +11,7 @@ from .data_acquisition import acquire_data_sources, render_data_acquisition_summ
 from .ideation import run_literature_ideation
 from .local_console import run_local_console
 from .model_architecture import build_model_execution_plan, render_model_architecture_summary
+from .pipeline_runner import render_pipeline_summary, run_review_gated_pipeline
 from .review_memory import (
     append_review_memory,
     collect_review_memory,
@@ -127,6 +128,20 @@ def parse_args() -> argparse.Namespace:
     console = subparsers.add_parser("console", help="Start a minimal local operations console.")
     console.add_argument("--host", default="127.0.0.1", help="Local bind host. Defaults to 127.0.0.1.")
     console.add_argument("--port", type=int, default=8765, help="Local console port. Defaults to 8765.")
+
+    pipeline = subparsers.add_parser(
+        "pipeline",
+        help="Run one review-gated local workflow: intake, generation, audit, and review hold.",
+    )
+    pipeline.add_argument("task", help="Research task or question.")
+    pipeline.add_argument("--source", type=Path, action="append", default=[], help="Local source file. Repeatable.")
+    pipeline.add_argument("--url", action="append", default=[], help="Explicit URL to acquire before processing.")
+    pipeline.add_argument("--template", default="paper", help="Workflow template: paper, policy, legal, interview, or web.")
+    pipeline.add_argument("--mode", choices=["ask", "ideate"], default="ask", help="Generate an answer draft or ideas.")
+    pipeline.add_argument("--ideas", type=int, default=5, help="Idea count when --mode ideate is used.")
+    pipeline.add_argument("--output-dir", type=Path, default=None, help="Optional pipeline artifact directory.")
+    pipeline.add_argument("--dry-run", action="store_true", help="Write artifacts without calling a model backend.")
+    pipeline.add_argument("--json", action="store_true", help="Print pipeline manifest as JSON.")
 
     ask = subparsers.add_parser("ask", help="Run a local model prompt and write review-gated artifacts.")
     ask.add_argument("prompt", help="Research or work request.")
@@ -304,6 +319,24 @@ def main() -> None:
         return
     if args.command == "console":
         run_local_console(repo_root=repo_root, config=config, config_path=args.config, host=args.host, port=args.port)
+        return
+    if args.command == "pipeline":
+        manifest = run_review_gated_pipeline(
+            task=args.task,
+            repo_root=repo_root,
+            config_path=args.config,
+            source_paths=args.source,
+            urls=args.url,
+            template_id=args.template,
+            mode=args.mode,
+            idea_count=args.ideas,
+            output_dir=args.output_dir,
+            dry_run=args.dry_run,
+        )
+        if args.json:
+            print(json.dumps(manifest, ensure_ascii=False, indent=2))
+        else:
+            print(render_pipeline_summary(manifest))
         return
     if args.command == "compress":
         result = compress_file_action(

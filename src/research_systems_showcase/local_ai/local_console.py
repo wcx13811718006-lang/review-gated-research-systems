@@ -73,6 +73,12 @@ def _command_cards() -> list[dict[str, str]]:
             "command": "research-ai-local --config local_ai.config.json workflow --template paper",
         },
         {
+            "title": "一键审阅流程",
+            "action": "pipeline",
+            "when": "按架构图串联采集、模型草稿、验证审计和 review hold，适合日常一站式处理。",
+            "command": 'research-ai-local --config local_ai.config.json pipeline "Draft a review-gated research note." --source README.md --template paper --mode ask',
+        },
+        {
             "title": "验证审计",
             "action": "audit",
             "when": "批量检查最近输出的失败模式、风险等级和需要 human review 的原因。",
@@ -547,17 +553,22 @@ def collect_recent_runs(repo_root: Path, config: dict[str, Any], limit: int = 6)
     records: list[dict[str, Any]] = []
     for run_dir in run_dirs[:limit]:
         request = _load_json(run_dir / "request.json")
+        manifest = _load_json(run_dir / "manifest.json")
         review_gate = _load_json(run_dir / "review_gate.json")
         if not request and not review_gate:
             continue
         records.append(
             {
-                "run_id": request.get("run_id") or run_dir.name,
+                "run_id": request.get("run_id") or manifest.get("run_id") or run_dir.name,
+                "mode": request.get("mode") or manifest.get("mode") or "research_prompt",
                 "created_at": request.get("created_at", ""),
-                "backend": request.get("backend", ""),
+                "prompt": request.get("prompt") or request.get("focus") or "",
+                "backend": request.get("backend") or manifest.get("backend", ""),
                 "decision": review_gate.get("decision", "unknown"),
                 "review_required": bool(review_gate.get("review_required", True)),
+                "can_export_final": bool(review_gate.get("can_export_final", False)),
                 "failed_checks": review_gate.get("failed_checks", []),
+                "artifacts": manifest.get("artifacts", {}) if isinstance(manifest.get("artifacts"), dict) else {},
                 "path": str(run_dir),
             }
         )
@@ -665,6 +676,7 @@ class ConsoleJob:
             "Generation error": "generation_error",
             "Run directory": "run_directory",
             "Manifest": "manifest",
+            "Pipeline directory": "pipeline_directory",
             "Acquired": "acquired",
             "Text extracted": "text_extracted",
             "Failed": "failed",
@@ -675,6 +687,18 @@ class ConsoleJob:
         }
         summary: dict[str, Any] = {"artifacts": []}
         for line in self.log_lines:
+            if line.startswith("- ") and ":" in line and "|" in line:
+                name_status, detail = line[2:].split("|", 1)
+                stage_name, status = name_status.split(":", 1)
+                stage_id = stage_name.strip()
+                if stage_id in {"ingestion", "routing", "validation", "review", "export"}:
+                    summary.setdefault("stages", []).append(
+                        {
+                            "stage_id": stage_id,
+                            "status": status.strip(),
+                            "detail": detail.strip(),
+                        }
+                    )
             for label, key in labels.items():
                 prefix = f"{label}:"
                 if line.startswith(prefix):
@@ -693,6 +717,7 @@ class LocalConsoleJobManager:
         "memory",
         "acquire",
         "workflow",
+        "pipeline",
         "audit",
         "review-memory",
         "compress",
@@ -744,6 +769,8 @@ class LocalConsoleJobManager:
             raise ValueError("Unsupported action. Only safe local console actions are allowed.")
         prompt = str(payload.get("prompt") or "").strip()
         source = str(payload.get("source") or "").strip()
+        template = str(payload.get("template") or "paper").strip().casefold() or "paper"
+        mode = str(payload.get("mode") or "ask").strip().casefold() or "ask"
 
         argv = [
             sys.executable,
@@ -785,6 +812,19 @@ class LocalConsoleJobManager:
             template = (prompt or source or "paper").strip().split()[0]
             prompt_display = template
             argv.extend(["workflow", "--template", template])
+        elif action == "pipeline":
+            title = "一键审阅流程"
+            task = prompt or "Draft a review-gated research note."
+            prompt_display = task
+            argv.extend(["pipeline", task, "--template", template, "--mode", mode])
+            if source.startswith(("http://", "https://")):
+                source_display = source
+                argv.extend(["--url", source])
+            else:
+                source_paths = self._resolve_source_paths(source or "README.md", allow_folder=True)
+                source_display = self._source_display(source or "README.md", source_paths)
+                for source_path in source_paths:
+                    argv.extend(["--source", str(source_path)])
         elif action == "audit":
             title = "验证审计"
             template = (prompt or source or "paper").strip().split()[0]
@@ -956,6 +996,12 @@ class LocalConsoleJobManager:
             stage = "verification audit ready"
         elif "local review memory" in normalized:
             stage = "review memory ready"
+        elif "review-gated local pipeline" in normalized:
+            stage = "pipeline orchestration ready"
+        elif "architecture stages:" in normalized:
+            stage = "architecture stages reported"
+        elif "pipeline directory:" in normalized:
+            stage = "pipeline artifacts available"
         if stage:
             with self.lock:
                 self.jobs[job_id].stage = stage
@@ -994,6 +1040,20 @@ def _choose_path_with_finder(kind: str) -> str:
         detail = result.stderr.strip() or result.stdout.strip() or "Finder selection was cancelled."
         raise ValueError(detail)
     return result.stdout.strip()
+
+
+def _open_path_in_finder(path_text: str, repo_root: Path) -> str:
+    candidate = Path(path_text).expanduser()
+    if not candidate.is_absolute():
+        candidate = repo_root / candidate
+    if not candidate.exists():
+        raise ValueError(f"Path does not exist: {candidate}")
+    resolved = candidate.resolve()
+    repo_resolved = repo_root.resolve()
+    if repo_resolved not in [resolved, *resolved.parents]:
+        raise ValueError("Only repository-local result paths can be opened from the console.")
+    subprocess.run(["open", str(resolved)], check=False)
+    return str(resolved)
 
 
 def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, Any]]) -> str:
@@ -1184,6 +1244,32 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       gap: 8px;
       margin-top: 8px;
     }}
+    .control-row {{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 8px;
+    }}
+    .control-row label {{
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }}
+    .control-row select {{
+      width: 100%;
+      border: 1px solid #d8cbb9;
+      border-radius: 12px;
+      background: #fffdf7;
+      padding: 10px 11px;
+      color: var(--ink);
+      font: inherit;
+      text-transform: none;
+      letter-spacing: 0;
+    }}
     .picker-btn {{
       border: 1px solid #d8cbb9;
       border-radius: 12px;
@@ -1267,6 +1353,51 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       margin-top: 4px;
       white-space: normal;
       word-break: break-word;
+    }}
+    .stage-ladder {{
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 10px;
+    }}
+    .stage-step {{
+      min-height: 56px;
+      padding: 8px;
+      border: 1px solid #e1d7c8;
+      border-radius: 12px;
+      background: #f4ede2;
+      color: var(--muted);
+      font-size: 12px;
+    }}
+    .stage-step strong {{
+      display: block;
+      color: var(--ink);
+      font-size: 13px;
+    }}
+    .stage-step.active {{
+      border-color: rgba(31, 90, 69, 0.45);
+      background: #dfeee5;
+      color: var(--green);
+    }}
+    .stage-step.done {{
+      background: #eef5ef;
+    }}
+    .stage-step.blocked, .stage-step.needs_review {{
+      border-color: rgba(167, 99, 24, 0.42);
+      background: #fff0d6;
+      color: var(--amber);
+    }}
+    .open-path-btn {{
+      display: inline-block;
+      margin: 6px 0 2px;
+      border: 0;
+      border-radius: 10px;
+      padding: 7px 10px;
+      color: white;
+      background: var(--green);
+      cursor: pointer;
+      font: inherit;
+      font-weight: 800;
     }}
     .job-meta {{
       display: flex;
@@ -1431,6 +1562,7 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       .rail, .inspector {{ border: 0; }}
       .workspace {{ min-height: 720px; }}
       .composer {{ grid-template-columns: 1fr; }}
+      .control-row, .stage-ladder {{ grid-template-columns: 1fr; }}
     }}
   </style>
 </head>
@@ -1473,6 +1605,7 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
         <div class="job-meta" id="liveJobMeta">
           <span class="job-chip">等待任务</span>
         </div>
+        <div class="stage-ladder" id="stageLadder"></div>
         <div class="result-summary" id="liveJobSummary">
           运行后这里会显示模型后端、Decision、Review required 和 artifact 路径。
         </div>
@@ -1480,6 +1613,23 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       </section>
       <section class="composer">
         <div>
+          <div class="control-row">
+            <label>材料类型
+              <select id="workflowTemplate">
+                <option value="paper">论文 paper</option>
+                <option value="policy">政策 policy</option>
+                <option value="legal">法律 legal</option>
+                <option value="interview">访谈 interview</option>
+                <option value="web">网页 web</option>
+              </select>
+            </label>
+            <label>输出方式
+              <select id="pipelineMode">
+                <option value="ask">研究问答草稿 ask</option>
+                <option value="ideate">文献创意起点 ideate</option>
+              </select>
+            </label>
+          </div>
           <textarea id="researchPrompt" placeholder="输入研究问题、文献任务或审阅目标。例如：根据这篇论文提出三个可验证研究思路。"></textarea>
           <div class="source-picker">
             <input id="sourcePath" placeholder="材料路径，可选。例如：/path/to/source.pdf 或 README.md">
@@ -1575,6 +1725,8 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
     function buildCommand() {{
       const prompt = document.getElementById('researchPrompt').value.trim();
       const source = document.getElementById('sourcePath').value.trim();
+      const template = document.getElementById('workflowTemplate').value || 'paper';
+      const mode = document.getElementById('pipelineMode').value || 'ask';
       const defaultSource = source || 'README.md';
       let command = selectedTask.command;
       if (prompt) {{
@@ -1592,11 +1744,19 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
         }}
       }}
       if (selectedTask.action === 'workflow') {{
-        const template = (prompt || source || 'paper').trim().split(/\\s+/)[0];
         command = 'research-ai-local --config local_ai.config.json workflow --template ' + JSON.stringify(template);
       }}
+      if (selectedTask.action === 'pipeline') {{
+        const task = prompt || 'Draft a review-gated research note.';
+        command = 'research-ai-local --config local_ai.config.json pipeline ' + JSON.stringify(task);
+        if (source.startsWith('http://') || source.startsWith('https://')) {{
+          command += ' --url ' + JSON.stringify(source);
+        }} else {{
+          command += ' --source ' + JSON.stringify(defaultSource);
+        }}
+        command += ' --template ' + JSON.stringify(template) + ' --mode ' + JSON.stringify(mode);
+      }}
       if (selectedTask.action === 'audit') {{
-        const template = (prompt || source || 'paper').trim().split(/\\s+/)[0];
         command = 'research-ai-local --config local_ai.config.json audit --template ' + JSON.stringify(template);
       }}
       if (selectedTask.action === 'review-memory') {{
@@ -1629,6 +1789,8 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
     async function runSelected() {{
       const prompt = document.getElementById('researchPrompt').value.trim();
       const source = document.getElementById('sourcePath').value.trim();
+      const template = document.getElementById('workflowTemplate').value || 'paper';
+      const mode = document.getElementById('pipelineMode').value || 'ask';
       const command = buildCommand();
       addAssistant('正在启动本地白名单任务。这里不会绕过 review gate，也不会自动最终化输出。', command);
       try {{
@@ -1638,7 +1800,9 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
           body: JSON.stringify({{
             action: selectedTask.action,
             prompt: prompt,
-            source: source
+            source: source,
+            template: template,
+            mode: mode
           }})
         }});
         const payload = await response.json();
@@ -1721,8 +1885,14 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
         detail.appendChild(meta);
         const path = document.createElement('small');
         path.textContent = run.path || '';
+        const openButton = document.createElement('button');
+        openButton.className = 'open-path-btn';
+        openButton.type = 'button';
+        openButton.textContent = '打开结果';
+        openButton.onclick = () => openPath(run.path || '');
         row.appendChild(detail);
         row.appendChild(path);
+        row.appendChild(openButton);
         runList.appendChild(row);
       }});
     }}
@@ -1797,6 +1967,7 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
           meta.appendChild(chip);
         }});
       }}
+      renderStageLadder(job);
       renderResultSummary(summary, job);
       const lines = [];
       lines.push(job.command_display || '');
@@ -1830,6 +2001,7 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
         '<span><strong>材料:</strong> ' + escapeHtml(source || 'README.md') + '</span>'
       ].join('');
       meta.innerHTML = '<span class="job-chip failed">未启动</span>';
+      document.getElementById('stageLadder').innerHTML = '';
       summary.innerHTML = '<span><strong>原因:</strong> ' + escapeHtml(error || 'unknown error') + '</span>';
       log.textContent = '任务没有进入后台队列。请检查材料路径，或点击“选择文件 / 选择文件夹”重新选择。';
     }}
@@ -1839,9 +2011,44 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       return number + (job.title || job.action || '本地任务');
     }}
 
+    function renderStageLadder(job) {{
+      const container = document.getElementById('stageLadder');
+      const result = job.result_summary || {{}};
+      const reported = result.stages || [];
+      const stageMap = {{}};
+      reported.forEach((stage) => {{
+        stageMap[stage.stage_id] = stage;
+      }});
+      const steps = [
+        ['ingestion', '采集'],
+        ['routing', '路由'],
+        ['validation', '验证'],
+        ['review', '审阅'],
+        ['export', '导出']
+      ];
+      let activeStage = 'validation';
+      const stageText = String(job.stage || '').toLowerCase();
+      if (job.action === 'acquire' || stageText.includes('intake')) activeStage = 'ingestion';
+      if (job.action === 'workflow' || stageText.includes('workflow')) activeStage = 'routing';
+      if (job.action === 'audit' || job.action === 'review-memory' || stageText.includes('review')) activeStage = 'review';
+      if (job.action === 'pipeline' && job.status === 'running') activeStage = 'validation';
+      container.innerHTML = '';
+      steps.forEach(([id, label]) => {{
+        const reportedStage = stageMap[id] || {{}};
+        const status = reportedStage.status || (id === activeStage && job.status === 'running' ? 'active' : 'pending');
+        const node = document.createElement('div');
+        node.className = 'stage-step ' + (status === 'completed' ? 'done' : status);
+        node.innerHTML = '<strong>' + escapeHtml(label) + '</strong><span>' + escapeHtml(status) + '</span>';
+        if (reportedStage.detail) {{
+          node.title = reportedStage.detail;
+        }}
+        container.appendChild(node);
+      }});
+    }}
+
     function renderResultSummary(container, job) {{
       const result = job.result_summary || {{}};
-      const hasResult = Boolean(result.backend || result.decision || result.review_required || result.can_export_final || result.generation_error || result.run_directory || result.manifest || result.acquired || (result.artifacts && result.artifacts.length));
+      const hasResult = Boolean(result.backend || result.decision || result.review_required || result.can_export_final || result.generation_error || result.run_directory || result.pipeline_directory || result.manifest || result.acquired || (result.artifacts && result.artifacts.length) || (result.stages && result.stages.length));
       if (!hasResult) {{
         container.innerHTML = '<span><strong>当前阶段：</strong>' + escapeHtml(job.stage || '等待输出') + '</span><span>模型运行中可能几十秒没有新日志；右侧仍会更新 PID 和耗时。</span>';
         return;
@@ -1852,17 +2059,41 @@ def render_workbench_html(snapshot: dict[str, Any], recent_runs: list[dict[str, 
       if (result.review_required) parts.push('<span><strong>Review required:</strong> ' + escapeHtml(result.review_required) + '</span>');
       if (result.can_export_final) parts.push('<span><strong>Can export final:</strong> ' + escapeHtml(result.can_export_final) + '</span>');
       if (result.generation_error) parts.push('<span><strong>Generation error:</strong> ' + escapeHtml(result.generation_error) + '</span>');
-      if (result.run_directory) parts.push('<span><strong>Run directory:</strong><code>' + escapeHtml(result.run_directory) + '</code></span>');
-      if (result.manifest) parts.push('<span><strong>Manifest:</strong><code>' + escapeHtml(result.manifest) + '</code></span>');
+      if (result.pipeline_directory) parts.push(pathSummary('Pipeline directory', result.pipeline_directory));
+      if (result.run_directory) parts.push(pathSummary('Run directory', result.run_directory));
+      if (result.manifest) parts.push(pathSummary('Manifest', result.manifest));
       ['acquired', 'text_extracted', 'failed', 'skipped', 'dry_run'].forEach((key) => {{
         if (result[key]) parts.push('<span><strong>' + escapeHtml(key) + ':</strong> ' + escapeHtml(result[key]) + '</span>');
       }});
       if (result.artifacts && result.artifacts.length) {{
         result.artifacts.forEach((artifact) => {{
-          parts.push('<span><strong>' + escapeHtml(artifact.name || 'artifact') + ':</strong><code>' + escapeHtml(artifact.path || '') + '</code></span>');
+          parts.push(pathSummary(artifact.name || 'artifact', artifact.path || ''));
         }});
       }}
       container.innerHTML = parts.join('');
+    }}
+
+    function pathSummary(label, path) {{
+      const safePath = escapeHtml(path || '');
+      return '<span><strong>' + escapeHtml(label) + ':</strong><code>' + safePath + '</code><button class="open-path-btn" type="button" onclick="openPath(' + JSON.stringify(path || '') + ')">在 Finder 打开</button></span>';
+    }}
+
+    async function openPath(path) {{
+      try {{
+        const response = await fetch('/api/open-path', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ path: path }})
+        }});
+        const payload = await response.json();
+        if (!response.ok) {{
+          addAssistant('无法打开结果路径：' + (payload.error || response.statusText));
+          return;
+        }}
+        addAssistant('已在 Finder 打开：' + payload.opened);
+      }} catch (error) {{
+        addAssistant('打开路径失败：' + error);
+      }}
     }}
 
     function escapeHtml(text) {{
@@ -1975,6 +2206,15 @@ class LocalConsoleServer:
                         self._send_json(400, {"error": str(exc)})
                         return
                     self._send_json(202, {"job": job})
+                    return
+                if self.path == "/api/open-path":
+                    try:
+                        payload = self._read_json_body()
+                        opened = _open_path_in_finder(str(payload.get("path") or ""), console.repo_root)
+                    except (ValueError, json.JSONDecodeError) as exc:
+                        self._send_json(400, {"error": str(exc)})
+                        return
+                    self._send_json(200, {"opened": opened})
                     return
                 self._send(404, "Not found", "text/plain")
 

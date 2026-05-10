@@ -28,6 +28,10 @@ from src.research_systems_showcase.local_ai.model_architecture import (
     build_model_execution_plan,
     render_model_architecture_summary,
 )
+from src.research_systems_showcase.local_ai.pipeline_runner import (
+    render_pipeline_summary,
+    run_review_gated_pipeline,
+)
 from src.research_systems_showcase.local_ai.quality import evaluate_local_answer
 from src.research_systems_showcase.local_ai.replay import compare_prefixed_columns
 from src.research_systems_showcase.local_ai.review_memory import (
@@ -330,6 +334,11 @@ class LocalAIRuntimeTests(unittest.TestCase):
         self.assertIn("研究流程模板", workbench)
         self.assertIn("验证审计", workbench)
         self.assertIn("审阅记忆", workbench)
+        self.assertIn("一键审阅流程", workbench)
+        self.assertIn("workflowTemplate", workbench)
+        self.assertIn("pipelineMode", workbench)
+        self.assertIn("stageLadder", workbench)
+        self.assertIn("/api/open-path", workbench)
 
     def test_local_console_jobs_only_build_safe_whitelisted_commands(self) -> None:
         manager = LocalConsoleJobManager(repo_root=PROJECT_ROOT, config={}, config_path=PROJECT_ROOT / "configs" / "local_ai.example.json")
@@ -368,6 +377,20 @@ class LocalAIRuntimeTests(unittest.TestCase):
         review_memory_job = manager._build_job({"action": "review-memory"})
         self.assertIn("review-memory", review_memory_job.argv)
         self.assertEqual(review_memory_job.title, "审阅记忆")
+
+        pipeline_job = manager._build_job(
+            {
+                "action": "pipeline",
+                "prompt": "Draft a staged review note.",
+                "source": "README.md",
+                "template": "paper",
+                "mode": "ask",
+            }
+        )
+        self.assertIn("pipeline", pipeline_job.argv)
+        self.assertIn("--template", pipeline_job.argv)
+        self.assertIn("--mode", pipeline_job.argv)
+        self.assertEqual(pipeline_job.title, "一键审阅流程")
 
     def test_local_console_job_records_prompt_and_source_identity(self) -> None:
         manager = LocalConsoleJobManager(repo_root=PROJECT_ROOT, config={}, config_path=PROJECT_ROOT / "configs" / "local_ai.example.json")
@@ -632,6 +655,37 @@ class LocalAIRuntimeTests(unittest.TestCase):
         summary = render_workflow_summary(workflow)
         self.assertIn("Stage-Gated Research Workflow", summary)
         self.assertIn("no auto", summary.casefold())
+
+    def test_review_gated_pipeline_writes_inspectable_artifacts_without_finalizing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "source.txt"
+            source.write_text(
+                "A short policy document about public administration and review-gated AI workflows.",
+                encoding="utf-8",
+            )
+
+            manifest = run_review_gated_pipeline(
+                task="Draft a review-gated summary.",
+                repo_root=root,
+                config_path=PROJECT_ROOT / "configs" / "local_ai.example.json",
+                source_paths=[source],
+                template_id="paper",
+                mode="ask",
+                output_dir=root / "outputs" / "pipeline_runs",
+                dry_run=True,
+            )
+
+            self.assertTrue(Path(manifest["manifest_path"]).exists())
+            self.assertFalse(manifest["can_export_final"])
+            self.assertTrue(manifest["review_required"])
+            self.assertIn("ingestion", [stage["stage_id"] for stage in manifest["stages"]])
+            self.assertIn("validation", [stage["stage_id"] for stage in manifest["stages"]])
+            self.assertIn("export", [stage["stage_id"] for stage in manifest["stages"]])
+
+            summary = render_pipeline_summary(manifest)
+            self.assertIn("Review-Gated Local Pipeline", summary)
+            self.assertIn("Can export final: False", summary)
 
     def test_verification_audit_escalates_failed_generation_runs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

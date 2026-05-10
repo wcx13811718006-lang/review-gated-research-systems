@@ -43,6 +43,7 @@ The console is now organized as a compact researcher workbench:
 - a "运行记忆" command that summarizes recent run artifacts, review queue, failed checks, and fallback usage
 - a "采集数据" command that fetches explicit URLs or copies local files into traceable intake artifacts
 - a "研究流程模板" command that generates stage-gated fields for papers, policy reports, legal materials, interviews, or web sources
+- a "一键审阅流程" command that runs the original architecture path as one local sequence: intake, routing template, draft or ideation, verification audit, and review hold
 - a "验证审计" command that inspects recurring failure patterns and escalation needs
 - a "审阅记忆" command that summarizes local human corrections and codebook decisions
 - a "运行并看反馈" path for running only whitelisted local actions from the browser
@@ -56,6 +57,8 @@ The console is now organized as a compact researcher workbench:
 - local artifact token estimates
 - Ollama and LM Studio status
 - configured, discovered, and effective model information
+- result-folder buttons for opening generated artifacts directly in Finder
+- an architecture-stage ladder showing intake, routing, validation, review, and export status
 - safe command examples
 - prompt-compression command examples for lowering draft-generation token cost
 
@@ -73,9 +76,31 @@ The raw diagnostic log is still available under "原始诊断" for debugging, bu
 
 The console still does not auto-finalize, auto-export, or silently clear review gates.
 
-The browser runner is intentionally narrow. It only starts the local actions already exposed by this repository: monitor, models, architecture, memory, acquire, workflow, audit, review-memory, compress, ask, and ideate. It does not execute arbitrary shell commands.
+The browser runner is intentionally narrow. It only starts the local actions already exposed by this repository: monitor, models, architecture, memory, acquire, workflow, pipeline, audit, review-memory, compress, ask, and ideate. It does not execute arbitrary shell commands.
 
-Folder selection is conservative. For ask and ideate tasks, the console expands a selected folder into supported source files up to a small limit. Compression remains single-file only.
+Folder selection is conservative. For ask, ideate, and pipeline tasks, the console expands a selected folder into supported source files up to a small limit. Compression remains single-file only.
+
+## One-Click Review-Gated Pipeline
+
+For daily use, choose "一键审阅流程" in the left rail, then:
+
+1. Select a material type: paper, policy, legal, interview, or web.
+2. Select an output mode: research draft or ideation.
+3. Choose a local file or folder.
+4. Enter the research request.
+5. Click "运行并看反馈".
+
+The command-line equivalent is:
+
+```bash
+research-ai-local --config local_ai.config.json pipeline \
+  "Draft a review-gated research note." \
+  --source README.md \
+  --template paper \
+  --mode ask
+```
+
+The pipeline writes a `pipeline_manifest.json` under `outputs/pipeline_runs/...` and links to the ordinary review-gated model run artifacts under `outputs/local_ai_runs/...`. It still blocks final export until human review approves or revises the output.
 
 ## Terminal Monitor
 

@@ -103,6 +103,7 @@ cp configs/local_ai.example.json local_ai.config.json
 research-ai-local --config local_ai.config.json status
 research-ai-local --config local_ai.config.json monitor
 research-ai-local --config local_ai.config.json console
+research-ai-local --config local_ai.config.json pipeline "Draft a review-gated research note." --source README.md --template paper --mode ask
 research-ai-local --config local_ai.config.json compress --source README.md --query "review-gated research workflow"
 research-ai-local --config local_ai.config.json ask "Summarize this repository for a research collaborator." --source README.md
 ```
@@ -119,7 +120,7 @@ Creative ideation from literature or legal sources is available through:
 research-ai-local --config local_ai.config.json ideate "Generate research ideas from this literature." --source "/path/to/source.pdf"
 ```
 
-The local operations console runs at `http://127.0.0.1:8765` and shows system load, token estimates, model routing, and safe commands without auto-finalizing outputs.
+The local operations console runs at `http://127.0.0.1:8765` and shows system load, token estimates, model routing, safe commands, task progress, architecture-stage status, and result-folder links without auto-finalizing outputs.
 On macOS, double-click [`start_local_ai_console.command`](./start_local_ai_console.command) to start the console directly.
 Recent local runs can be inspected without approving or exporting them:
 
@@ -137,6 +138,7 @@ Stage-gated templates and audit commands support broader social-science material
 
 ```bash
 research-ai-local --config local_ai.config.json workflow --template paper
+research-ai-local --config local_ai.config.json pipeline "Draft a review-gated research note." --source README.md --template paper --mode ask
 research-ai-local --config local_ai.config.json audit --template paper
 research-ai-local --config local_ai.config.json review-memory
 ```

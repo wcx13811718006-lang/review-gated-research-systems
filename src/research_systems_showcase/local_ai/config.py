@@ -65,6 +65,9 @@ DEFAULT_LOCAL_AI_CONFIG: dict[str, Any] = {
         "timeout_seconds": 30,
         "extracted_text_char_limit": 200_000,
     },
+    "local_pipeline": {
+        "outputs_dir": "outputs/pipeline_runs",
+    },
     "review_memory": {
         "dir": "outputs/review_memory",
     },

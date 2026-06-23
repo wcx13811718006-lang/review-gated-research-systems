@@ -1,0 +1,17 @@
+source_priority:
+  - Nation/Tribe/project implementer official source
+  - responsible government or agency official source
+  - technical report or monitoring report
+  - credible supporting source
+  - news or secondary discovery source
+
+hard_rules:
+  - Nation-authored sources control public wording for Tribal/Nation-led cases.
+  - Supporting sources cannot override primary-source public-use boundaries.
+  - Modified timestamps cannot replace project dates in page content.
+  - Program portfolio metrics cannot be converted into single local project outcomes.
+  - Funded, planned, or in-development language cannot be rewritten as operational or completed.
+  - 403, 404, paywall, redirect loop, and ambiguous pages enter parked status.
+  - PDFs must retain page or section locators.
+  - Hash and snapshot metadata are required before evidence locking.
+

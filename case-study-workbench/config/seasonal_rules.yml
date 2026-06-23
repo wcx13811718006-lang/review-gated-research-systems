@@ -1,0 +1,24 @@
+spring:
+  ordering_tags: [water, snowmelt, fish passage, floodplain]
+  static_fallback: true
+summer:
+  ordering_tags: [heat, drought, smoke, cooling access]
+  static_fallback: true
+fall:
+  ordering_tags: [wildfire preparedness, community readiness, storm prep]
+  static_fallback: true
+winter:
+  ordering_tags: [coastal flooding, storms, sea-level rise, relocation planning]
+  static_fallback: true
+
+dynamic_context_policy:
+  allowed:
+    - reorder already approved cards
+    - show timestamp and official data source
+    - show current context label
+  prohibited:
+    - generate health or safety advice
+    - rewrite approved case claims
+    - imply a case is effective in a current event
+    - block the main page when an API fails
+

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Review Queue Prototype</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Public-safe prototype</p>
+        <h1>Review Queue</h1>
+      </div>
+      <div class="status-strip" aria-label="Queue counters">
+        <span><strong id="totalCount">0</strong> total</span>
+        <span><strong id="blockedCount">0</strong> blocked</span>
+        <span><strong id="pendingCount">0</strong> pending</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="queue-panel" aria-label="Review queue">
+        <div class="filters" aria-label="Filters">
+          <label>
+            Route
+            <select id="routeFilter">
+              <option value="all">All routes</option>
+              <option value="blocked_export">Blocked export</option>
+              <option value="mandatory_full_review">Mandatory full review</option>
+              <option value="targeted_review">Targeted review</option>
+              <option value="random_audit">Random audit</option>
+            </select>
+          </label>
+          <label>
+            Decision
+            <select id="decisionFilter">
+              <option value="all">All decisions</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="changes_requested">Changes requested</option>
+              <option value="parked">Parked</option>
+            </select>
+          </label>
+        </div>
+        <div id="queueList" class="queue-list" role="list"></div>
+      </aside>
+
+      <section class="detail-panel" aria-live="polite">
+        <div class="detail-head">
+          <div>
+            <p id="detailRoute" class="pill">No item selected</p>
+            <h2 id="detailTitle">Select a claim</h2>
+          </div>
+          <div class="actions" aria-label="Review decisions">
+            <button id="approveBtn" type="button">Approve</button>
+            <button id="changeBtn" type="button">Request changes</button>
+            <button id="parkBtn" type="button">Park</button>
+          </div>
+        </div>
+
+        <div class="split">
+          <article>
+            <h3>Claim</h3>
+            <p id="claimText" class="claim-copy">No claim selected.</p>
+            <dl class="meta-grid">
+              <div>
+                <dt>Claim ID</dt>
+                <dd id="claimId">-</dd>
+              </div>
+              <div>
+                <dt>Class</dt>
+                <dd id="claimClass">-</dd>
+              </div>
+              <div>
+                <dt>Locator</dt>
+                <dd id="locator">-</dd>
+              </div>
+              <div>
+                <dt>Reviewer</dt>
+                <dd id="reviewer">-</dd>
+              </div>
+            </dl>
+          </article>
+
+          <article>
+            <h3>Evidence</h3>
+            <div id="sourceList" class="source-list"></div>
+          </article>
+        </div>
+
+        <section class="review-note">
+          <h3>Review Note</h3>
+          <textarea id="noteBox" rows="6" aria-label="Review note"></textarea>
+          <p id="decisionPreview" class="decision-preview">Decision history is local to this prototype.</p>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

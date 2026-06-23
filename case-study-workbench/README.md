@@ -46,3 +46,9 @@ python3 -m venv .venv
 - `review/queue.py`: review queue item builder
 - `export/public_json.py`: approved-only JSON export
 
+## Static Review Prototype
+
+Open `review_app/index.html` to inspect a synthetic review queue prototype. It
+shows route filters, claim/source side-by-side review, locator display, notes,
+and local approve/change/park decision controls. The prototype uses
+`review_app/sample_queue.json` only; it does not contain real case data.

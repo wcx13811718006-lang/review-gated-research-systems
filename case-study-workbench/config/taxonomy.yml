@@ -1,0 +1,35 @@
+hazards:
+  - coastal change
+  - ocean acidification
+  - sea-level rise
+  - flooding
+  - drought
+  - water supply
+  - wildfire smoke
+  - extreme heat
+  - fisheries
+  - wetlands
+
+claim_classes:
+  - context
+  - planned_action
+  - funded_action
+  - implementation_activity
+  - program_reported_output
+  - modeled_benefit
+  - measured_outcome
+  - lesson_learned
+  - transferability_condition
+  - uncertainty
+  - prohibited_public_claim
+
+seasons:
+  spring:
+    tags: [water, snowmelt, fish passage, floodplain]
+  summer:
+    tags: [heat, drought, smoke, cooling access]
+  fall:
+    tags: [wildfire preparedness, community readiness, storm prep]
+  winter:
+    tags: [coastal flooding, storms, sea-level rise, relocation planning]
+

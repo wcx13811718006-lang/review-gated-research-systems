@@ -30,6 +30,16 @@ Many research-support workflows fail at handoff points. A record can be partiall
 5. Status surface:
    [`demo/sample_outputs/system_status.csv`](./demo/sample_outputs/system_status.csv)
 
+## Additional Public-Safe Workbench Scaffold
+
+This repository also includes a standalone public-safe scaffold for a
+claim-level, review-gated case-study workbench:
+[`case-study-workbench/`](./case-study-workbench/).
+
+It demonstrates source snapshotting, HTML/PDF parsing with locators,
+no-guess metadata extraction, claim-boundary controls, review routing, and
+approved-only JSON export using synthetic fixtures only.
+
 ## Architecture Overview
 
 ```mermaid

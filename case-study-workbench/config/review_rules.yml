@@ -1,0 +1,33 @@
+mandatory_full_review:
+  - Tribal/Nation-led
+  - cultural knowledge
+  - data sovereignty
+  - relocation
+  - public health
+  - smoke
+  - fisheries
+  - wetlands
+  - hydrology
+  - flooding
+  - sea-level rise
+  - engineering
+  - legal/safety
+  - measured outcome
+
+targeted_review:
+  - conflicting status/date
+  - missing project lead
+  - broad portfolio
+  - uncertain geography
+  - source owner unclear
+  - substantive page diff
+
+blocked_export:
+  - unresolved mandatory review
+  - unsupported outcome claim
+  - missing primary source
+  - missing claim-source mapping
+  - missing rights or alt text
+  - stale or failed required source
+  - Nation/public-use boundary unresolved
+

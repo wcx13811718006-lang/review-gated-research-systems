@@ -1,0 +1,74 @@
+[
+  {
+    "id": "QUEUE_CLM_EXAMPLE_001",
+    "case_id": "EX_CASE_001",
+    "case_title": "Example Resilience Center Upgrade",
+    "claim_id": "CLM_EXAMPLE_001",
+    "claim_text": "The example city received funding to upgrade a resilience center.",
+    "claim_class": "funded_action",
+    "route": "random_audit",
+    "reviewer_role": "public reviewer",
+    "decision": "pending",
+    "note": "Random audit sample for low-risk metadata calibration.",
+    "source_ids": ["SRC_EXAMPLE_001"],
+    "source_summaries": [
+      {
+        "id": "SRC_EXAMPLE_001",
+        "owner": "Example City Resilience Office",
+        "authority": "primary",
+        "url": "https://example.org/resilience-center",
+        "fetch_status": "verified"
+      }
+    ],
+    "locator": "html:p[3]",
+    "risk_flags": []
+  },
+  {
+    "id": "QUEUE_CLM_EXAMPLE_002",
+    "case_id": "EX_CASE_001",
+    "case_title": "Example Resilience Center Upgrade",
+    "claim_id": "CLM_EXAMPLE_002",
+    "claim_text": "The funded facility is now operating as a resilience center.",
+    "claim_class": "implementation_activity",
+    "route": "blocked_export",
+    "reviewer_role": "facility operations reviewer",
+    "decision": "pending",
+    "note": "Blocked until funded status is not transformed into operating status.",
+    "source_ids": ["SRC_EXAMPLE_001"],
+    "source_summaries": [
+      {
+        "id": "SRC_EXAMPLE_001",
+        "owner": "Example City Resilience Office",
+        "authority": "primary",
+        "url": "https://example.org/resilience-center",
+        "fetch_status": "verified"
+      }
+    ],
+    "locator": "html:p[3]",
+    "risk_flags": ["funding_to_operation"]
+  },
+  {
+    "id": "QUEUE_CLM_EXAMPLE_003",
+    "case_id": "EX_CASE_002",
+    "case_title": "Example Shoreline Adaptation",
+    "claim_id": "CLM_EXAMPLE_003",
+    "claim_text": "Transferability depends on site-specific exposure, permitting, maintenance capacity, and monitoring.",
+    "claim_class": "transferability_condition",
+    "route": "targeted_review",
+    "reviewer_role": "technical reviewer",
+    "decision": "changes_requested",
+    "note": "Targeted review requested clearer transferability wording.",
+    "source_ids": ["SRC_EXAMPLE_002"],
+    "source_summaries": [
+      {
+        "id": "SRC_EXAMPLE_002",
+        "owner": "Example Coastal Partnership",
+        "authority": "supporting",
+        "url": "https://example.org/shoreline-adaptation",
+        "fetch_status": "verified"
+      }
+    ],
+    "locator": "pdf:page=4",
+    "risk_flags": ["modeled_not_measured"]
+  }
+]
